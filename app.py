@@ -8,6 +8,9 @@ import anthropic
 import time
 import re
 from datetime import datetime
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
@@ -172,7 +175,7 @@ Rispondi SOLO con il JSON, nessun testo aggiuntivo."""
                     story.update({
                         'relevance': item.get('relevance', 'medium'),
                         'ccm_angle': item.get('ccm_angle', ''),
-                        'lfg_angle': item.get('ccm_angle', ''),  # backwards compat
+                        'lfg_angle': item.get('ccm_angle', ''),
                         'best_format': item.get('best_format', '$CCM Take'),
                         'trending_hook': item.get('trending_hook', ''),
                         'virality_score': item.get('virality_score', 50),
