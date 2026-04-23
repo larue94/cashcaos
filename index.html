@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>$CCM — Cash & Caos Media OS</title>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@1,400;1,700&family=Barlow+Condensed:ital,wght@0,700;0,900;1,700;1,900&family=Barlow:wght@400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --black:  #060606;
+  --forest: #1A3C2F;
+  --forest2:#152E24;
+  --white:  #FFFFFF;
+  --muted:  #5a7a6a;
+  --muted2: #3a5a4a;
+  --grey2:  #0D1D16;
+  --grey3:  #162518;
+  --grey4:  #1e3228;
+  --green:  #00D26A;
+  --red:    #FF5F5F;
+  /* orange only for interactive accents on black, never on green */
+  --accent: #FFFFFF;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: var(--black);
+  color: var(--white);
+  font-family: 'Barlow', sans-serif;
+  min-height: 100vh;
+}
+
+/* ── TICKER ── */
+.ticker {
+  height: 34px;
+  background: var(--forest);
+  border-bottom: 2px solid var(--white);
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.ticker-badge {
+  background: var(--black);
+  height: 100%;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  border-right: 1px solid rgba(255,255,255,0.15);
+}
+
+.ticker-badge-mark {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 900;
+  font-style: italic;
+  font-size: 16px;
+  color: var(--white);
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+}
+
+.ticker-track {
+  display: flex;
+  gap: 36px;
+  animation: roll 28s linear infinite;
+  white-space: nowrap;
+  padding-left: 20px;
+}
+
+.ti {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.5);
+  font-weight: 700;
+}
+
+@keyframes roll { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.15} }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── TOPBAR ── */
+.topbar {
+  background: var(--forest);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding: 0 28px;
+  display: flex;
+  align-items: center;
+  height: 52px;
+  gap: 28px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.topbar-brand {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 900;
+  font-style: italic;
+  font-size: 22px;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+  color: var(--white);
+  flex-shrink: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  line-height: 1;
+}
+
+.topbar-brand small {
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.topbar-nav { display:flex; gap:2px; flex:1; }
+
+.nav-btn {
+  padding: 7px 16px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255,255,255,0.4);
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+  margin-bottom: -1px;
+}
+
+.nav-btn:hover { color: var(--white); }
+.nav-btn.active { color: var(--white); border-bottom-color: var(--white); }
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.api-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.35);
+}
+
+.status-dot { width:7px; height:7px; border-radius:50%; background:var(--red); }
+.status-dot.active { background: var(--green); animation: pulse 2s infinite; }
+
+.settings-btn {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.55);
+  padding: 6px 12px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.settings-btn:hover { border-color: var(--white); color: var(--white); }
+
+/* ── TABS ── */
+.tab-content { display:none; }
+.tab-content.active { display:block; }
+
+/* ── PAGE ── */
+.page { padding: 28px 32px; max-width: 1400px; margin: 0 auto; }
+
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.page-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 900;
+  font-size: 26px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--white);
+  line-height: 1;
+}
+
+.page-sub {
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* ── BUTTONS ── */
+.btn {
+  padding: 9px 18px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 900;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.btn-primary { background: var(--forest); color: var(--white); border: 1px solid rgba(255,255,255,0.2); }
+.btn-primary:hover { background: var(--forest2); border-color: var(--white); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-secondary { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.1); }
+.btn-secondary:hover { border-color: rgba(255,255,255,0.3); color: var(--white); }
+
+.btn-white { background: var(--white); color: var(--black); }
+.btn-white:hover { background: rgba(255,255,255,0.9); }
+
+.btn-sm { padding: 5px 12px; font-size: 11px; }
+
+/* ── CARDS ── */
+.card { background: var(--grey2); border: 1px solid var(--grey3); overflow: hidden; }
+.card-header { padding: 12px 18px; border-bottom: 1px solid var(--grey3); display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.card-body { padding: 18px; }
+
+/* ── STORY GRID ── */
+.story-grid { display:grid; grid-template-columns:1fr 1fr; gap:2px; }
+
+.story-card {
+  background: var(--grey2);
+  border: 1px solid var(--grey3);
+  border-top: 3px solid var(--grey4);
+  overflow: hidden;
+  animation: fadeIn 0.3s ease both;
+}
+
+.story-card.high { border-top-color: var(--white); }
+.story-card.medium { border-top-color: rgba(255,255,255,0.3); }
+
+.sc-header { padding: 14px 18px 10px; border-bottom: 1px solid var(--grey3); }
+.sc-source-row { display:flex; align-items:center; gap:8px; margin-bottom:7px; flex-wrap:wrap; }
+.sc-title { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:16px; color:var(--white); line-height:1.3; letter-spacing:0.01em; }
+.sc-angle { font-family:'EB Garamond',serif; font-style:italic; font-size:13px; color:rgba(255,255,255,0.6); line-height:1.4; margin-top:7px; }
+
+.sc-body { padding: 12px 18px; display:flex; flex-direction:column; gap:10px; }
+
+.vscore { display:flex; align-items:center; gap:8px; }
+.vscore-bar { flex:1; height:3px; background:var(--grey4); border-radius:2px; overflow:hidden; }
+.vscore-fill { height:100%; background:var(--white); border-radius:2px; transition:width 0.6s ease; }
+.vscore-num { font-family:'Share Tech Mono',monospace; font-size:12px; color:var(--white); min-width:28px; text-align:right; font-weight:700; }
+
+.badge {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 1px;
+}
+
+.badge-white { background:rgba(255,255,255,0.08); color:rgba(255,255,255,0.6); border:1px solid rgba(255,255,255,0.15); }
+.badge-forest { background:rgba(26,60,47,0.8); color:rgba(255,255,255,0.7); border:1px solid rgba(255,255,255,0.1); }
+.badge-dim { background:rgba(255,255,255,0.03); color:rgba(255,255,255,0.25); border:1px solid rgba(255,255,255,0.06); }
+
+.sc-hook {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.5;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.02);
+  border-left: 2px solid rgba(255,255,255,0.12);
+}
+
+.sc-hook strong { color: var(--white); font-family:'Barlow Condensed',sans-serif; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; }
+
+.sc-actions {
+  padding: 10px 18px;
+  border-top: 1px solid var(--grey3);
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ── MODAL ── */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.88);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal-overlay.show { display:flex; }
+
+.modal {
+  background: var(--grey2);
+  border: 1px solid var(--grey3);
+  border-top: 4px solid var(--white);
+  width: 100%;
+  max-width: 720px;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--grey3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  background: var(--grey2);
+  z-index: 1;
+}
+
+.modal-title { font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:17px; text-transform:uppercase; letter-spacing:0.06em; color:var(--white); }
+.modal-close { background:none; border:none; color:var(--muted); font-size:18px; cursor:pointer; padding:4px 8px; }
+.modal-close:hover { color:var(--white); }
+.modal-body { padding: 24px; display:flex; flex-direction:column; gap:18px; }
+
+.script-block {
+  background: var(--black);
+  border: 1px solid var(--grey3);
+  border-left: 3px solid var(--white);
+  padding: 20px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--white);
+  white-space: pre-wrap;
+  min-height: 160px;
+}
+
+.script-block.teleprompter { font-size: 20px; line-height: 2.1; font-weight: 500; }
+
+/* ── CAPTIONS ── */
+.caption-input-area { display:grid; grid-template-columns:1fr 1fr; gap:2px; margin-bottom:2px; }
+
+.cin-card {
+  background: var(--grey2);
+  border: 1px solid var(--grey3);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cin-label { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:12px; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); display:flex; align-items:center; gap:7px; }
+
+textarea, input[type="text"], input[type="password"] {
+  background: var(--black);
+  border: 1px solid var(--grey3);
+  color: var(--white);
+  padding: 10px 12px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  line-height: 1.6;
+  width: 100%;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+textarea:focus, input:focus { border-color: rgba(255,255,255,0.4); }
+textarea { min-height: 110px; }
+
+.caption-results { display:grid; grid-template-columns:1fr 1fr; gap:2px; }
+
+.plat-result { background:var(--grey2); border:1px solid var(--grey3); overflow:hidden; }
+
+.pr-header {
+  padding: 11px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--grey3);
+  border-top: 3px solid rgba(255,255,255,0.15);
+}
+
+.pr-name { font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:13px; text-transform:uppercase; letter-spacing:0.06em; color:var(--white); display:flex; align-items:center; gap:7px; }
+.pr-body { padding:14px; display:flex; flex-direction:column; gap:9px; }
+.pr-caption-text { font-family:'Barlow',sans-serif; font-size:13px; color:var(--white); line-height:1.7; white-space:pre-wrap; min-height:70px; }
+.pr-char { font-family:'Share Tech Mono',monospace; font-size:10px; color:var(--muted); letter-spacing:0.08em; }
+.pr-hook { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:12px; color:var(--white); text-transform:uppercase; letter-spacing:0.04em; padding:7px 9px; background:rgba(255,255,255,0.04); border-left:2px solid var(--white); }
+
+/* ── VIDEO STUDIO ── */
+.drop-zone {
+  border: 2px dashed var(--grey4);
+  padding: 56px 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--grey2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.drop-zone:hover, .drop-zone.dragover { border-color: rgba(255,255,255,0.4); background:rgba(255,255,255,0.02); }
+.drop-icon { font-size: 44px; opacity: 0.3; }
+.drop-title { font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:20px; text-transform:uppercase; letter-spacing:0.06em; color:var(--white); }
+.drop-sub { font-family:'Share Tech Mono',monospace; font-size:10px; color:var(--muted); letter-spacing:0.15em; text-transform:uppercase; }
+
+.vr-grid { display:grid; grid-template-columns:1fr 1fr; gap:2px; margin-top:2px; }
+.vr-card { background:var(--grey2); border:1px solid var(--grey3); padding:20px; display:flex; flex-direction:column; gap:12px; }
+.vr-label { font-family:'Share Tech Mono',monospace; font-size:10px; color:rgba(255,255,255,0.4); letter-spacing:0.18em; text-transform:uppercase; }
+.vr-value { font-family:'Barlow Condensed',sans-serif; font-weight:900; font-style:italic; font-size:20px; color:var(--white); letter-spacing:-0.01em; line-height:1.2; }
+
+.clip-sug {
+  background: var(--black);
+  border: 1px solid var(--grey3);
+  border-left: 3px solid var(--white);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.cs-time { font-family:'Share Tech Mono',monospace; font-size:10px; color:rgba(255,255,255,0.4); letter-spacing:0.1em; }
+.cs-hook { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:14px; color:var(--white); text-transform:uppercase; letter-spacing:0.03em; }
+.cs-why { font-family:'Barlow',sans-serif; font-size:12px; color:var(--muted); line-height:1.5; }
+
+/* FRAME PREVIEW */
+.fp-wrap { display:flex; flex-direction:column; align-items:center; gap:12px; }
+
+.fp {
+  width: 200px;
+  height: 356px;
+  position: relative;
+  overflow: hidden;
+  background: #0d1d16;
+  flex-shrink: 0;
+}
+
+.fp-bg { position:absolute; inset:0; background:linear-gradient(150deg,#0d1d16,#111f18); }
+
+.fp-top {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 34px;
+  background: rgba(26,60,47,0.97);
+  border-bottom: 2px solid var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  z-index: 10;
+}
+
+.fp-mark { font-family:'Barlow Condensed',sans-serif; font-weight:900; font-style:italic; font-size:14px; color:var(--white); letter-spacing:-0.02em; text-transform:uppercase; }
+.fp-live { display:flex; align-items:center; gap:4px; font-family:'Share Tech Mono',monospace; font-size:7px; color:rgba(255,255,255,0.3); letter-spacing:0.1em; }
+.fp-dot { width:5px; height:5px; background:var(--white); border-radius:50%; animation:blink 1.2s infinite; }
+
+.fp-stripe { position:absolute; left:0; top:34px; bottom:0; width:2px; background:var(--white); z-index:9; }
+
+.fp-bot {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: rgba(26,60,47,0.97);
+  border-top: 2px solid var(--white);
+  padding: 8px 8px 8px 10px;
+  z-index: 10;
+}
+
+.fp-ep { font-family:'Share Tech Mono',monospace; font-size:6px; color:rgba(255,255,255,0.4); letter-spacing:0.14em; text-transform:uppercase; margin-bottom:2px; }
+.fp-title { font-family:'Barlow Condensed',sans-serif; font-weight:900; font-style:italic; font-size:10px; color:var(--white); text-transform:uppercase; letter-spacing:0.01em; line-height:1.2; }
+.fp-handle { font-family:'Share Tech Mono',monospace; font-size:6px; color:rgba(255,255,255,0.25); letter-spacing:0.1em; margin-top:3px; }
+
+/* ── SETTINGS PANEL ── */
+.settings-panel {
+  position: fixed;
+  top: 86px;
+  right: 0;
+  bottom: 0;
+  width: 340px;
+  background: var(--forest);
+  border-left: 1px solid rgba(255,255,255,0.1);
+  z-index: 90;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+}
+
+.settings-panel.open { transform: translateX(0); }
+
+.settings-title { font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:17px; text-transform:uppercase; letter-spacing:0.08em; color:var(--white); padding-bottom:14px; border-bottom:1px solid rgba(255,255,255,0.1); }
+.settings-group { display:flex; flex-direction:column; gap:9px; }
+.settings-label { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:12px; text-transform:uppercase; letter-spacing:0.08em; color:rgba(255,255,255,0.5); }
+.settings-note { font-family:'EB Garamond',serif; font-style:italic; font-size:12px; color:rgba(255,255,255,0.35); line-height:1.5; }
+
+/* ── FILTERS ── */
+.filter-bar { display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap; align-items:center; }
+
+.filter-btn {
+  padding: 5px 12px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  border: 1px solid var(--grey4);
+  background: var(--grey2);
+  color: var(--muted);
+  transition: all 0.15s;
+}
+
+.filter-btn:hover { border-color:rgba(255,255,255,0.3); color:var(--white); }
+.filter-btn.active { background:var(--forest); color:var(--white); border-color:rgba(255,255,255,0.2); }
+
+/* ── LOADING ── */
+.loading { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:72px 32px; gap:14px; }
+.loading-mark { font-family:'Barlow Condensed',sans-serif; font-weight:900; font-style:italic; font-size:44px; color:var(--white); letter-spacing:-0.03em; text-transform:uppercase; animation:pulse 1.5s infinite; }
+.loading-text { font-family:'Share Tech Mono',monospace; font-size:10px; color:var(--muted); letter-spacing:0.18em; text-transform:uppercase; }
+
+/* ── EMPTY ── */
+.empty { text-align:center; padding:72px 32px; display:flex; flex-direction:column; align-items:center; gap:10px; }
+.empty-icon { font-size:44px; opacity:0.15; }
+.empty-title { font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:18px; text-transform:uppercase; letter-spacing:0.06em; color:rgba(255,255,255,0.3); }
+.empty-sub { font-family:'EB Garamond',serif; font-style:italic; font-size:13px; color:var(--muted); }
+
+/* ── TOAST ── */
+.toast {
+  position: fixed;
+  bottom: 22px;
+  right: 22px;
+  background: var(--forest);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-left: 4px solid var(--white);
+  padding: 12px 18px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--white);
+  z-index: 9999;
+  transform: translateY(80px);
+  opacity: 0;
+  transition: all 0.3s ease;
+}
+
+.toast.show { transform: translateY(0); opacity: 1; }
+
+@media (max-width:900px) {
+  .topbar { padding:0 14px; }
+  .page { padding:16px; }
+  .story-grid, .caption-results, .caption-input-area, .vr-grid { grid-template-columns:1fr; }
+  .settings-panel { width:100%; }
+}
+</style>
+</head>
+<body>
+
+<!-- TICKER -->
+<div class="ticker">
+  <div class="ticker-badge"><span class="ticker-badge-mark">$CCM</span></div>
+  <div class="ticker-track">
+    <span class="ti">CASH &amp; CAOS</span>&nbsp;·&nbsp;
+    <span class="ti">TECH · FINANCE · GEOPOLITICA</span>&nbsp;·&nbsp;
+    <span class="ti">@CASH_CAOS</span>&nbsp;·&nbsp;
+    <span class="ti">EST. MMXXVI · MILANO / BERLIN</span>&nbsp;·&nbsp;
+    <span class="ti">CASH &amp; CAOS</span>&nbsp;·&nbsp;
+    <span class="ti">TECH · FINANCE · GEOPOLITICA</span>&nbsp;·&nbsp;
+    <span class="ti">@CASH_CAOS</span>&nbsp;·&nbsp;
+    <span class="ti">EST. MMXXVI · MILANO / BERLIN</span>&nbsp;·&nbsp;
+  </div>
+</div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-brand">
+    $CCM
+    <small>Cash &amp; Caos Media OS</small>
+  </div>
+  <nav class="topbar-nav">
+    <button class="nav-btn active" onclick="switchTab('ideas', this)">💡 Ideas Feed</button>
+    <button class="nav-btn" onclick="switchTab('video', this)">🎬 Video Studio</button>
+    <button class="nav-btn" onclick="switchTab('captions', this)">✍️ Captions</button>
+  </nav>
+  <div class="topbar-right">
+    <div class="api-status">
+      <div class="status-dot" id="apiDot"></div>
+      <span id="apiText">Checking...</span>
+    </div>
+    <button class="settings-btn" onclick="toggleSettings()">⚙ Settings</button>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="settings-panel" id="settingsPanel">
+  <div class="settings-title">⚙ Settings</div>
+  <div class="settings-group">
+    <div class="settings-label">Anthropic API Key</div>
+    <div class="settings-note">Necessaria per tutto. Ottienila su console.anthropic.com</div>
+    <input type="password" id="anthropicKey" placeholder="sk-ant-api03-..."/>
+    <div id="anthropicStatus" class="settings-note"></div>
+  </div>
+  <button class="btn btn-white" onclick="saveSettings()">Salva</button>
+  <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:20px;">
+    <div class="settings-label" style="margin-bottom:10px;">Brand</div>
+    <div class="settings-note" style="margin-bottom:8px;">Handle social</div>
+    <input type="text" id="brandHandle" value="@cash_caos"/>
+    <div class="settings-note" style="margin-top:12px;margin-bottom:8px;">Brand name</div>
+    <input type="text" id="brandName" value="Cash &amp; Caos"/>
+  </div>
+  <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:16px;">
+    <div class="settings-note">$CCM Media OS — Built with Claude<br>Est. MMXXVI · Milano / Berlin</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ IDEAS ══════════════════════════ -->
+<div id="tab-ideas" class="tab-content active">
+<div class="page">
+  <div class="page-header">
+    <div>
+      <div class="page-title">💡 Ideas Feed</div>
+      <div class="page-sub">HN · TechCrunch · Product Hunt · The Verge — analizzate da AI per $CCM</div>
+    </div>
+    <button class="btn btn-primary" onclick="loadIdeas()" id="refreshBtn">⟳ Fetch Ideas</button>
+  </div>
+
+  <div class="filter-bar" id="filterBar" style="display:none;">
+    <span style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:0.18em;text-transform:uppercase;">Filtra:</span>
+    <button class="filter-btn active" onclick="filterStories('all', this)">Tutti</button>
+    <button class="filter-btn" onclick="filterStories('high', this)">🔥 High Score</button>
+    <button class="filter-btn" onclick="filterStories('Hacker News', this)">HN</button>
+    <button class="filter-btn" onclick="filterStories('TechCrunch', this)">TC</button>
+    <button class="filter-btn" onclick="filterStories('Product Hunt', this)">PH</button>
+    <button class="filter-btn" onclick="filterStories('The Verge', this)">Verge</button>
+  </div>
+
+  <div id="ideasContainer">
+    <div class="empty">
+      <div class="empty-icon">🔍</div>
+      <div class="empty-title">Nessuna idea ancora</div>
+      <div class="empty-sub">Clicca "Fetch Ideas" per scrapare le ultime storie</div>
+      <button class="btn btn-primary" style="margin-top:14px;" onclick="loadIdeas()">⟳ Fetch Ideas</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══════════════════════════ VIDEO ══════════════════════════ -->
+<div id="tab-video" class="tab-content">
+<div class="page">
+  <div class="page-header">
+    <div>
+      <div class="page-title">🎬 Video Studio</div>
+      <div class="page-sub">Droppa il video raw — AI genera titolo, frame label, clip suggestions</div>
+    </div>
+  </div>
+
+  <div class="drop-zone" id="dropZone" onclick="document.getElementById('videoInput').click()"
+       ondragover="handleDragOver(event)" ondrop="handleDrop(event)" ondragleave="handleDragLeave(event)">
+    <input type="file" id="videoInput" accept="video/*" style="display:none;" onchange="handleVideoFile(event)">
+    <div class="drop-icon">🎥</div>
+    <div class="drop-title">Drop raw video here</div>
+    <div class="drop-sub">MP4 · MOV · AVI — oppure click per selezionare</div>
+  </div>
+
+  <div id="videoTopicArea" style="display:none;margin-top:2px;">
+    <div class="cin-card">
+      <div class="cin-label">📝 Topic / Contesto (opzionale)</div>
+      <textarea id="videoTopic" placeholder="Di cosa parla il video? Es: 'startup italiana XYZ ha raccolto €5M da Sequoia senza pitch deck' — oppure lascia vuoto"></textarea>
+      <button class="btn btn-primary" onclick="processVideo()" id="processBtn">🤖 Analizza con AI</button>
+    </div>
+  </div>
+
+  <div id="videoResults" style="display:none;margin-top:2px;">
+    <div class="vr-grid">
+      <div class="vr-card">
+        <div class="vr-label">📌 Titolo suggerito</div>
+        <div class="vr-value" id="vSugTitle">—</div>
+        <div class="vr-label" style="margin-top:8px;">▶️ YouTube Title</div>
+        <div style="font-family:'Barlow',sans-serif;font-size:14px;color:var(--white);line-height:1.4;" id="vYtTitle">—</div>
+        <div class="vr-label" style="margin-top:8px;">🖼 Frame Text</div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--white);letter-spacing:0.08em;" id="vFrameText">—</div>
+        <div class="vr-label" style="margin-top:8px;">🎯 Episode Label</div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:0.08em;" id="vEpLabel">—</div>
+        <div class="vr-label" style="margin-top:8px;">🖼 Thumbnail Hook</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-style:italic;font-size:18px;color:var(--white);" id="vThumbHook">—</div>
+      </div>
+      <!-- FRAME PREVIEW -->
+      <div class="vr-card" style="align-items:center;justify-content:center;">
+        <div class="vr-label">📱 Frame Preview (Forest 9:16)</div>
+        <div class="fp" style="margin-top:10px;">
+          <div class="fp-bg"></div>
+          <div class="fp-top">
+            <div class="fp-mark">$CCM</div>
+            <div class="fp-live"><div class="fp-dot"></div>@cash_caos</div>
+          </div>
+          <div class="fp-stripe"></div>
+          <div class="fp-bot">
+            <div class="fp-ep" id="fpEp">$CCM · Daily</div>
+            <div class="fp-title" id="fpTitle">Il titolo del tuo video</div>
+            <div class="fp-handle">@cash_caos</div>
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-sm" style="margin-top:8px;" onclick="copyFrameText()">📋 Copia frame text</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:2px;">
+      <div class="card-header">
+        <span style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:15px;text-transform:uppercase;letter-spacing:0.06em;">✂️ Clip Suggestions</span>
+        <button class="btn btn-secondary btn-sm" onclick="sendClipsToCaption()">→ Genera Captions</button>
+      </div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:9px;" id="clipSugs"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══════════════════════════ CAPTIONS ══════════════════════════ -->
+<div id="tab-captions" class="tab-content">
+<div class="page">
+  <div class="page-header">
+    <div>
+      <div class="page-title">✍️ Captions</div>
+      <div class="page-sub">Topic o script → captions ottimizzate per IG · TikTok · X · LinkedIn · YouTube</div>
+    </div>
+  </div>
+
+  <div class="caption-input-area">
+    <div class="cin-card">
+      <div class="cin-label">📝 Topic o Script</div>
+      <textarea id="capTopic" placeholder="Descrivi il video oppure incolla il voicescript. Es: 'La startup italiana XYZ vale €50M e nessuno in Italia ne parla ancora — Sequoia ha investito...'"></textarea>
+    </div>
+    <div class="cin-card">
+      <div class="cin-label">🎯 Contesto extra (opzionale)</div>
+      <textarea id="capContext" placeholder="Formato: Offcut / Take / Numero / Scan&#10;Mood: aggressivo / informativo / breaking&#10;Hashtag preferiti da includere"></textarea>
+      <button class="btn btn-primary" onclick="generateCaptions()" id="capBtn">🤖 Genera Caption per tutti i canali</button>
+    </div>
+  </div>
+
+  <div id="capResults" style="display:none;margin-top:2px;">
+    <div class="caption-results" id="capGrid"></div>
+  </div>
+
+  <div id="capEmpty" class="empty">
+    <div class="empty-icon">✍️</div>
+    <div class="empty-title">Nessuna caption ancora</div>
+    <div class="empty-sub">Inserisci il topic e clicca "Genera Caption"</div>
+  </div>
+</div>
+</div>
+
+<!-- VOICESCRIPT MODAL -->
+<div class="modal-overlay" id="scriptModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modalTitle">Voicescript</div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:0.1em;margin-top:3px;" id="modalMeta"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:7px;">
+        <button class="btn btn-secondary btn-sm" onclick="setMode('normal')">Normale</button>
+        <button class="btn btn-white btn-sm" onclick="setMode('teleprompter')">🎬 Teleprompter</button>
+      </div>
+      <div class="script-block" id="scriptContent"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-white" onclick="copyScript()">📋 Copia Script</button>
+        <button class="btn btn-primary" onclick="scriptToCaption()">→ Genera Captions</button>
+        <button class="btn btn-secondary" onclick="closeModal()">Chiudi</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';  // same origin on Railway
+let allStories = [];
+let currentVideo = null;
+let currentVideoResult = null;
+
+// ── INIT ──
+window.onload = () => { checkApi(); loadSavedSettings(); };
+
+async function checkApi() {
+  try {
+    const r = await fetch(`${API}/api/settings`);
+    const d = await r.json();
+    const dot = document.getElementById('apiDot');
+    const txt = document.getElementById('apiText');
+    if (d.anthropic_configured) {
+      dot.classList.add('active');
+      txt.textContent = 'AI Ready';
+      document.getElementById('anthropicStatus').textContent = `Configurata: ${d.anthropic_key_preview}`;
+      document.getElementById('anthropicStatus').style.color = 'rgba(255,255,255,0.5)';
+    } else {
+      txt.textContent = 'No API Key';
+    }
+  } catch(e) {
+    document.getElementById('apiText').textContent = 'Server offline';
+  }
+}
+
+function loadSavedSettings() {
+  const h = localStorage.getItem('ccm_handle') || '@cash_caos';
+  const n = localStorage.getItem('ccm_name')   || 'Cash & Caos';
+  document.getElementById('brandHandle').value = h;
+  document.getElementById('brandName').value   = n;
+}
+
+// ── NAVIGATION ──
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`tab-${tab}`).classList.add('active');
+  if (btn) btn.classList.add('active');
+}
+
+function switchTabDirect(tab) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`tab-${tab}`).classList.add('active');
+  const i = tab === 'ideas' ? 0 : tab === 'video' ? 1 : 2;
+  document.querySelectorAll('.nav-btn')[i].classList.add('active');
+}
+
+function toggleSettings() {
+  document.getElementById('settingsPanel').classList.toggle('open');
+}
+
+// ── SETTINGS ──
+async function saveSettings() {
+  const key   = document.getElementById('anthropicKey').value;
+  const handle= document.getElementById('brandHandle').value;
+  const name  = document.getElementById('brandName').value;
+  localStorage.setItem('ccm_handle', handle);
+  localStorage.setItem('ccm_name',   name);
+  if (key) {
+    await fetch(`${API}/api/settings`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({anthropic_key: key})
+    });
+    showToast('✓ Settings salvati');
+    checkApi();
+  } else {
+    showToast('✓ Brand settings salvati');
+  }
+}
+
+// ── IDEAS ──
+async function loadIdeas() {
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true; btn.textContent = '⟳ Fetching...';
+  document.getElementById('ideasContainer').innerHTML = `
+    <div class="loading">
+      <div class="loading-mark">$CCM</div>
+      <div class="loading-text">Scraping HN · TechCrunch · Product Hunt · The Verge</div>
+      <div class="loading-text" style="font-size:9px;margin-top:6px;">Analisi AI in corso...</div>
+    </div>`;
+  try {
+    const r = await fetch(`${API}/api/ideas`);
+    const d = await r.json();
+    allStories = d.stories || [];
+    renderStories(allStories);
+    document.getElementById('filterBar').style.display = 'flex';
+    showToast(`✓ ${allStories.length} storie analizzate`);
+  } catch(e) {
+    document.getElementById('ideasContainer').innerHTML = `
+      <div class="empty"><div class="empty-icon">⚠️</div>
+      <div class="empty-title">Errore connessione</div>
+      <div class="empty-sub">Controlla che il server sia attivo</div></div>`;
+  }
+  btn.disabled = false; btn.textContent = '⟳ Fetch Ideas';
+}
+
+function filterStories(filter, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  let filtered = allStories;
+  if (filter === 'high')    filtered = allStories.filter(s => (s.virality_score||0) >= 70);
+  else if (filter !== 'all') filtered = allStories.filter(s => s.source === filter);
+  renderStories(filtered);
+}
+
+function renderStories(stories) {
+  if (!stories.length) {
+    document.getElementById('ideasContainer').innerHTML = `
+      <div class="empty"><div class="empty-icon">🔍</div>
+      <div class="empty-title">Nessuna storia</div>
+      <div class="empty-sub">Cambia filtro o fai un nuovo fetch</div></div>`;
+    return;
+  }
+  document.getElementById('ideasContainer').innerHTML =
+    `<div class="story-grid">${stories.map(storyCard).join('')}</div>`;
+}
+
+function storyCard(s) {
+  const score = s.virality_score || 0;
+  const rel   = s.relevance || 'medium';
+  const ago   = s.time ? timeAgo(s.time) : '';
+  const fmt   = s.best_format || '$CCM Take';
+
+  return `
+  <div class="story-card ${rel}">
+    <div class="sc-header">
+      <div class="sc-source-row">
+        <span class="badge ${rel === 'high' ? 'badge-white' : rel === 'medium' ? 'badge-forest' : 'badge-dim'}">${rel === 'high' ? '🔥 HIGH' : rel === 'medium' ? '⚡ MED' : '· LOW'}</span>
+        <span class="badge badge-dim">${esc(s.source)}</span>
+        ${fmt ? `<span class="badge badge-forest">${esc(fmt)}</span>` : ''}
+        ${ago ? `<span style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);margin-left:auto;">${ago}</span>` : ''}
+      </div>
+      <div class="sc-title">${esc(s.title)}</div>
+      ${s.ccm_angle || s.lfg_angle ? `<div class="sc-angle">${esc(s.ccm_angle || s.lfg_angle)}</div>` : ''}
+    </div>
+    <div class="sc-body">
+      ${score > 0 ? `
+      <div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:5px;">Virality Score</div>
+        <div class="vscore">
+          <div class="vscore-bar"><div class="vscore-fill" style="width:${score}%"></div></div>
+          <div class="vscore-num">${score}</div>
+        </div>
+      </div>` : ''}
+      ${s.trending_hook ? `<div class="sc-hook"><strong>Hook</strong><br>${esc(s.trending_hook)}</div>` : ''}
+      ${(s.virality_reasons||[]).slice(0,2).map(r => `
+        <div style="font-family:'Barlow',sans-serif;font-size:11px;color:var(--muted);display:flex;gap:6px;">
+          <span style="color:rgba(255,255,255,0.3);">→</span>${esc(r)}
+        </div>`).join('')}
+      ${s.italian_relevance ? `<div class="sc-hook"><strong>🇮🇹 Italia</strong><br>${esc(s.italian_relevance)}</div>` : ''}
+    </div>
+    <div class="sc-actions">
+      ${s.voicescript ? `<button class="btn btn-white btn-sm" onclick='openScript(${JSON.stringify(s)})'>🎬 Script</button>` : ''}
+      <button class="btn btn-primary btn-sm" onclick='storyToCaption(${JSON.stringify({title:s.title,angle:s.ccm_angle||s.lfg_angle||"",script:s.voicescript||""})})'>✍️ Captions</button>
+      ${s.url ? `<a href="${esc(s.url)}" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration:none;">↗ Fonte</a>` : ''}
+      ${s.score > 0 ? `<span style="margin-left:auto;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);">▲${s.score} · ${s.comments}c</span>` : ''}
+    </div>
+  </div>`;
+}
+
+// ── MODAL ──
+function openScript(s) {
+  document.getElementById('modalTitle').textContent = s.best_format || 'Voicescript';
+  document.getElementById('modalMeta').textContent  = `${s.source} · ${s.trending_hook || ''}`;
+  document.getElementById('scriptContent').textContent = s.voicescript || '—';
+  document.getElementById('scriptContent').classList.remove('teleprompter');
+  document.getElementById('scriptModal').classList.add('show');
+}
+
+function closeModal() { document.getElementById('scriptModal').classList.remove('show'); }
+function setMode(m) {
+  const el = document.getElementById('scriptContent');
+  m === 'teleprompter' ? el.classList.add('teleprompter') : el.classList.remove('teleprompter');
+}
+function copyScript() {
+  navigator.clipboard.writeText(document.getElementById('scriptContent').textContent).then(() => showToast('✓ Script copiato!'));
+}
+function scriptToCaption() {
+  const txt = document.getElementById('scriptContent').textContent;
+  closeModal();
+  switchTabDirect('captions');
+  document.getElementById('capTopic').value = txt;
+  setTimeout(generateCaptions, 150);
+}
+
+function storyToCaption(s) {
+  const content = s.script || s.angle || s.title;
+  switchTabDirect('captions');
+  document.getElementById('capTopic').value = content;
+  setTimeout(generateCaptions, 100);
+}
+
+// ── CAPTIONS ──
+async function generateCaptions() {
+  const topic   = document.getElementById('capTopic').value;
+  const context = document.getElementById('capContext').value;
+  if (!topic.trim()) { showToast('⚠ Inserisci un topic'); return; }
+  const btn = document.getElementById('capBtn');
+  btn.disabled = true; btn.textContent = '🤖 Generando...';
+  document.getElementById('capEmpty').style.display  = 'none';
+  document.getElementById('capResults').style.display = 'none';
+  try {
+    const r = await fetch(`${API}/api/captions`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({custom_input: topic + (context ? '\n\nContesto: ' + context : '')})
+    });
+    const d = await r.json();
+    if (d.error) { showToast('⚠ ' + d.error); document.getElementById('capEmpty').style.display = 'flex'; }
+    else { renderCaptions(d.captions); document.getElementById('capResults').style.display = 'block'; showToast('✓ Caption generate per 5 piattaforme!'); }
+  } catch(e) { showToast('Errore connessione'); document.getElementById('capEmpty').style.display = 'flex'; }
+  btn.disabled = false; btn.textContent = '🤖 Genera Caption per tutti i canali';
+}
+
+function renderCaptions(caps) {
+  const plats = [
+    {k:'instagram', n:'Instagram', i:'📸'},
+    {k:'tiktok',    n:'TikTok',    i:'🎵'},
+    {k:'x',         n:'X/Twitter', i:'𝕏'},
+    {k:'linkedin',  n:'LinkedIn',  i:'💼'},
+    {k:'youtube',   n:'YouTube',   i:'▶️'},
+  ];
+  document.getElementById('capGrid').innerHTML = plats.map(p => {
+    const d    = caps[p.k] || {};
+    const cap  = d.caption || d.description || '';
+    const hook = d.hook_line || '';
+    const chars= d.char_count || cap.length;
+    const tags = (d.hashtags || d.tags || []).join(' ');
+    const ytT  = d.title || '';
+    return `
+    <div class="plat-result">
+      <div class="pr-header">
+        <div class="pr-name">${p.i} ${p.n}</div>
+        <div style="display:flex;gap:7px;align-items:center;">
+          <span class="badge badge-dim">${chars} ch</span>
+          <button class="btn btn-secondary btn-sm" onclick="copyCaption('cap_${p.k}')">📋 Copy</button>
+        </div>
+      </div>
+      <div class="pr-body">
+        ${hook ? `<div class="pr-hook">Hook: ${esc(hook)}</div>` : ''}
+        ${ytT  ? `<div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:15px;color:var(--white);">${esc(ytT)}</div>` : ''}
+        <div class="pr-caption-text" id="cap_${p.k}">${esc(cap)}</div>
+        ${tags ? `<div style="font-family:'Barlow',sans-serif;font-size:11px;color:rgba(255,255,255,0.35);line-height:1.7;">${esc(tags)}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function copyCaption(id) {
+  const el = document.getElementById(id);
+  if (el) navigator.clipboard.writeText(el.textContent).then(() => showToast('✓ Caption copiata!'));
+}
+
+// ── VIDEO STUDIO ──
+function handleDragOver(e)  { e.preventDefault(); document.getElementById('dropZone').classList.add('dragover'); }
+function handleDragLeave()  { document.getElementById('dropZone').classList.remove('dragover'); }
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('video/')) setVideoFile(f);
+}
+function handleVideoFile(e) { const f = e.target.files[0]; if (f) setVideoFile(f); }
+
+function setVideoFile(f) {
+  currentVideo = f;
+  document.getElementById('dropZone').innerHTML = `
+    <div class="drop-icon">✅</div>
+    <div class="drop-title">${esc(f.name)}</div>
+    <div class="drop-sub">${(f.size/1024/1024).toFixed(1)}MB · Pronto</div>`;
+  document.getElementById('videoTopicArea').style.display  = 'block';
+  document.getElementById('videoResults').style.display    = 'none';
+}
+
+async function processVideo() {
+  if (!currentVideo) return;
+  const btn = document.getElementById('processBtn');
+  btn.disabled = true; btn.textContent = '🤖 Analizzando...';
+  try {
+    const r = await fetch(`${API}/api/video/process`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({filename: currentVideo.name, topic: document.getElementById('videoTopic').value})
+    });
+    const d = await r.json();
+    if (d.success) { currentVideoResult = d.result; renderVideoResult(d.result); showToast('✓ Video analizzato!'); }
+    else showToast('⚠ ' + (d.error || 'Errore'));
+  } catch(e) { showToast('Errore connessione'); }
+  btn.disabled = false; btn.textContent = '🤖 Analizza con AI';
+}
+
+function renderVideoResult(r) {
+  document.getElementById('vSugTitle').textContent   = r.suggested_title  || '—';
+  document.getElementById('vYtTitle').textContent    = r.youtube_title     || '—';
+  document.getElementById('vFrameText').textContent  = r.frame_text        || '—';
+  document.getElementById('vEpLabel').textContent    = r.episode_label     || '—';
+  document.getElementById('vThumbHook').textContent  = r.thumbnail_hook    || '—';
+  document.getElementById('fpTitle').textContent     = r.suggested_title   || 'Il tuo titolo';
+  document.getElementById('fpEp').textContent        = r.episode_label     || '$CCM · Daily';
+
+  document.getElementById('clipSugs').innerHTML = (r.clip_suggestions||[]).map(c => `
+    <div class="clip-sug">
+      <div style="display:flex;gap:7px;align-items:center;">
+        <span class="cs-time">⏱ ${c.time_range||'—'}</span>
+        <span class="badge badge-white">${c.platform_primary||'IG'}</span>
+        <span class="badge badge-forest">${c.format||'Take'}</span>
+      </div>
+      <div class="cs-hook">${esc(c.hook||'—')}</div>
+      <div class="cs-why">${esc(c.why||'')}</div>
+    </div>`).join('');
+
+  document.getElementById('videoResults').style.display = 'block';
+}
+
+function sendClipsToCaption() {
+  if (!currentVideoResult) return;
+  switchTabDirect('captions');
+  document.getElementById('capTopic').value = `Video: ${currentVideoResult.suggested_title||''}`;
+  setTimeout(generateCaptions, 100);
+}
+
+function copyFrameText() {
+  const t = `${document.getElementById('fpEp').textContent}\n${document.getElementById('fpTitle').textContent}\n@cash_caos`;
+  navigator.clipboard.writeText(t).then(() => showToast('✓ Frame text copiato!'));
+}
+
+// ── UTILS ──
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
+function timeAgo(ts) {
+  const d = Math.floor(Date.now()/1000) - ts;
+  if (d < 3600)  return `${Math.floor(d/60)}m fa`;
+  if (d < 86400) return `${Math.floor(d/3600)}h fa`;
+  return `${Math.floor(d/86400)}g fa`;
+}
+
+// Close modal on outside click
+document.getElementById('scriptModal').addEventListener('click', e => { if (e.target === document.getElementById('scriptModal')) closeModal(); });
+
+// Close settings on outside click
+document.addEventListener('click', e => {
+  const p = document.getElementById('settingsPanel');
+  const b = document.querySelector('.settings-btn');
+  if (p.classList.contains('open') && !p.contains(e.target) && !b.contains(e.target)) p.classList.remove('open');
+});
+</script>
+</body>
+</html>
