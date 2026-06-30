@@ -21,6 +21,12 @@ except ImportError:
     os.system("pip install anthropic flask flask-cors python-dotenv")
     import anthropic
 
+try:
+    from research_tools import run_full_research, format_research_for_claude
+    RESEARCH_AVAILABLE = True
+except ImportError:
+    RESEARCH_AVAILABLE = False
+
 app = Flask(__name__)
 CORS(app)
 
@@ -97,7 +103,7 @@ If it fails any: start with REVISE: then list exactly what must change."""
     return call_claude(system, prompt, max_tokens=600)
 
 
-def pipeline(product_info, q):
+def pipeline(product_info, competitors, keywords, tavily_api_key, q):
     R = {}
 
     def emit(num, name, status, output="", preview=""):
@@ -118,22 +124,47 @@ def pipeline(product_info, q):
         return out
 
     try:
+        # ── Live Research ─────────────────────────────
+        live_research = ""
+        if RESEARCH_AVAILABLE:
+            q.put({"type": "phase", "label": "LIVE RESEARCH (Jina AI + Tavily + Reddit + Trends)"})
+            q.put({"type": "agent", "num": "0", "name": "Research Runner", "status": "running",
+                   "output": "", "preview": "Pulling live market data..."})
+            try:
+                kw_list = [k.strip() for k in keywords.split(',') if k.strip()] if keywords else None
+                comp_list = [c.strip() for c in competitors.split(',') if c.strip()] if competitors else None
+                raw = run_full_research(
+                    product_info,
+                    competitors=comp_list,
+                    keywords=kw_list,
+                    tavily_api_key=tavily_api_key or None,
+                )
+                live_research = format_research_for_claude(raw)
+                q.put({"type": "agent", "num": "0", "name": "Research Runner", "status": "done",
+                       "output": live_research, "preview": live_research[:200]})
+            except Exception as re:
+                live_research = f"Research failed: {re}"
+                q.put({"type": "agent", "num": "0", "name": "Research Runner", "status": "revised",
+                       "output": live_research, "preview": live_research[:200]})
+
+        research_ctx = f"\n\nLIVE MARKET RESEARCH:\n{live_research}\n" if live_research else ""
+
         q.put({"type": "phase", "label": "PHASE 1: DEEP RESEARCH"})
 
         R["market"] = run("1", "Market Researcher", "market",
-            f"Research the market for this product. Find:\n1. Top 3 pain points this solves\n2. What existing solutions frustrate people and why\n3. Emotional language people use when complaining\n4. What has gone viral in this category and why\n5. What the market desperately wants but can't find\n\nPRODUCT:\n{product_info}\n\nBe specific.")
+            f"Research the market for this product. Find:\n1. Top 3 pain points this solves\n2. What existing solutions frustrate people and why\n3. Emotional language people use when complaining\n4. What has gone viral in this category and why\n5. What the market desperately wants but can't find\n\nPRODUCT:\n{product_info}{research_ctx}\nBe specific.")
 
         R["reddit"] = run("2", "Reddit Researcher", "reddit",
-            f"Simulate real Reddit thread language about the problem this product solves.\nFind: What do people hate about existing solutions? Exact words? What are they asking for?\n\nPRODUCT: {product_info}\nMARKET: {R['market'][:400]}")
+            f"Simulate real Reddit thread language about the problem this product solves.\nFind: What do people hate about existing solutions? Exact words? What are they asking for?\n\nPRODUCT: {product_info}\nMARKET: {R['market'][:400]}{research_ctx}")
 
         R["viral"] = run("3", "Viral Launch Analyzer", "viral",
-            f"What viral launch patterns apply to this product category?\nWhat hooks work NOW? What claims go viral? What's dead positioning?\n\nPRODUCT: {product_info}")
+            f"What viral launch patterns apply to this product category?\nWhat hooks work NOW? What claims go viral? What's dead positioning?\n\nPRODUCT: {product_info}{research_ctx}")
 
         R["voice"] = run("4", "Customer Voice", "customer_voice",
-            f"Extract the exact emotional language customers use about this problem.\nNot professional language — raw, frustrated, specific.\n\nPRODUCT: {product_info}\nREDDIT: {R['reddit'][:400]}")
+            f"Extract the exact emotional language customers use about this problem.\nNot professional language — raw, frustrated, specific.\n\nPRODUCT: {product_info}\nREDDIT: {R['reddit'][:400]}{research_ctx}")
 
         R["novelty"] = run("5", "Novelty Extractor", "novelty",
-            f"What is GENUINELY novel about this product? Not features. Not 'AI-powered.'\nThe one thing that has never been combined this way.\n\nPRODUCT: {product_info}\nMARKET: {R['market'][:400]}")
+            f"What is GENUINELY novel about this product? Not features. Not 'AI-powered.'\nThe one thing that has never been combined this way.\n\nPRODUCT: {product_info}\nMARKET: {R['market'][:400]}{research_ctx}")
 
         q.put({"type": "phase", "label": "PHASE 2: BOLD CLAIM"})
 
@@ -248,12 +279,21 @@ def index():
 
 @app.route('/api/launch', methods=['POST'])
 def launch():
-    product_info = request.json.get('product_info', '').strip()
+    body = request.json or {}
+    product_info = body.get('product_info', '').strip()
     if not product_info:
         return {"error": "No product info provided"}, 400
 
+    competitors = body.get('competitors', '')
+    keywords = body.get('keywords', '')
+    tavily_api_key = body.get('tavily_api_key', '') or os.environ.get('TAVILY_API_KEY', '')
+
     q = queue.Queue()
-    thread = threading.Thread(target=pipeline, args=(product_info, q), daemon=True)
+    thread = threading.Thread(
+        target=pipeline,
+        args=(product_info, competitors, keywords, tavily_api_key, q),
+        daemon=True
+    )
     thread.start()
 
     def generate():
@@ -273,13 +313,24 @@ def launch():
 @app.route('/api/settings', methods=['GET'])
 def get_settings():
     key = os.environ.get('ANTHROPIC_API_KEY', '')
-    return {"configured": bool(key), "preview": f"sk-ant-...{key[-6:]}" if len(key) > 6 else ""}
+    tavily = os.environ.get('TAVILY_API_KEY', '')
+    return {
+        "configured": bool(key),
+        "preview": f"sk-ant-...{key[-6:]}" if len(key) > 6 else "",
+        "tavily_configured": bool(tavily),
+        "tavily_preview": f"tvly-...{tavily[-6:]}" if len(tavily) > 6 else "",
+        "research_available": RESEARCH_AVAILABLE,
+    }
 
 @app.route('/api/settings', methods=['POST'])
 def save_settings():
-    key = request.json.get('api_key', '')
+    body = request.json or {}
+    key = body.get('api_key', '')
+    tavily = body.get('tavily_api_key', '')
     if key:
         os.environ['ANTHROPIC_API_KEY'] = key
+    if tavily:
+        os.environ['TAVILY_API_KEY'] = tavily
     return {"success": True}
 
 
@@ -386,7 +437,11 @@ input[type=password]:focus{border-color:rgba(255,255,255,0.4);}
   <div class="s-note">Required for all 21 agents. Get it at console.anthropic.com</div>
   <input type="password" id="apiKeyInput" placeholder="sk-ant-api03-..."/>
   <div class="s-note" id="keyStatus"></div>
-  <button class="btn btn-white" style="width:100%;justify-content:center;" onclick="saveKey()">Save Key</button>
+  <div class="s-label" style="margin-top:8px;">Tavily API Key <span style="color:rgba(255,255,255,0.3);font-weight:400;text-transform:none;">(optional)</span></div>
+  <div class="s-note">Free tier: 1000 searches/month. Sign up at tavily.com for richer LinkedIn + Reddit research.</div>
+  <input type="password" id="tavilyKeyInput" placeholder="tvly-..."/>
+  <div class="s-note" id="tavilyStatus"></div>
+  <button class="btn btn-white" style="width:100%;justify-content:center;" onclick="saveKey()">Save Keys</button>
 </div>
 
 <div class="main">
@@ -398,7 +453,18 @@ input[type=password]:focus{border-color:rgba(255,255,255,0.4);}
   <div class="input-card">
     <label class="input-label">Describe your product launch</label>
     <textarea id="productInput" placeholder="Include:&#10;• What it is and what it does&#10;• Who it's for&#10;• Key features or capabilities&#10;• Main competitors / existing alternatives&#10;• What makes it different&#10;• Any traction, numbers, social proof"></textarea>
-    <div class="btn-row">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+      <div>
+        <label class="input-label" style="margin-bottom:6px;">Competitors <span style="color:rgba(255,255,255,0.3);font-weight:400;text-transform:none;">(optional)</span></label>
+        <input type="text" id="competitorsInput" placeholder="Notion, Airtable, Linear..." style="width:100%;background:var(--black);border:1px solid var(--grey3);color:var(--white);padding:10px 12px;font-family:'Barlow',sans-serif;font-size:13px;outline:none;" onfocus="this.style.borderColor='rgba(255,255,255,0.4)'" onblur="this.style.borderColor='var(--grey3)'">
+      </div>
+      <div>
+        <label class="input-label" style="margin-bottom:6px;">Keywords <span style="color:rgba(255,255,255,0.3);font-weight:400;text-transform:none;">(optional)</span></label>
+        <input type="text" id="keywordsInput" placeholder="project management, AI, teams..." style="width:100%;background:var(--black);border:1px solid var(--grey3);color:var(--white);padding:10px 12px;font-family:'Barlow',sans-serif;font-size:13px;outline:none;" onfocus="this.style.borderColor='rgba(255,255,255,0.4)'" onblur="this.style.borderColor='var(--grey3)'">
+      </div>
+    </div>
+    <div class="btn-row" style="align-items:center;gap:12px;">
+      <div id="researchBadge" style="display:none;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--green);padding:4px 10px;border:1px solid rgba(0,210,106,0.3);border-radius:2px;">Live Research ON</div>
       <button class="btn btn-white" id="launchBtn" onclick="startLaunch()">⟶ Run 21 Agents</button>
     </div>
   </div>
@@ -429,6 +495,7 @@ const AGENTS = [
   ["16","Mom Test"],["17","Weapons: Novelty"],["18","Weapons: Intensity"],
   ["19","Filler Cutter"],["20","Final Manager"],["21","Final Assembler"]
 ];
+let researchAvailable = false;
 
 window.onload = checkApi;
 
@@ -439,6 +506,12 @@ async function checkApi() {
     document.getElementById('apiDot').className = 'api-dot' + (d.configured ? ' on' : '');
     document.getElementById('apiText').textContent = d.configured ? 'AI Ready' : 'No API Key';
     if (d.configured) document.getElementById('keyStatus').textContent = `Active: ${d.preview}`;
+    if (d.tavily_configured) {
+      document.getElementById('tavilyStatus').textContent = `Active: ${d.tavily_preview}`;
+    }
+    researchAvailable = d.research_available;
+    const badge = document.getElementById('researchBadge');
+    if (badge) badge.style.display = d.research_available ? 'block' : 'none';
   } catch(e) {
     document.getElementById('apiText').textContent = 'Server offline';
   }
@@ -450,9 +523,14 @@ function toggleSettings() {
 
 async function saveKey() {
   const key = document.getElementById('apiKeyInput').value.trim();
-  if (!key) return;
-  await fetch('/api/settings', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({api_key:key})});
-  showToast('✓ API key saved');
+  const tavily = document.getElementById('tavilyKeyInput').value.trim();
+  if (!key && !tavily) return;
+  await fetch('/api/settings', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({api_key: key, tavily_api_key: tavily})
+  });
+  showToast('✓ Keys saved');
   checkApi();
   document.getElementById('settingsPanel').classList.remove('open');
 }
@@ -460,7 +538,8 @@ async function saveKey() {
 function buildAgentList() {
   const el = document.getElementById('agentList');
   el.innerHTML = '';
-  AGENTS.forEach(([num, name]) => {
+  const allAgents = researchAvailable ? [["0","Research Runner"], ...AGENTS] : AGENTS;
+  allAgents.forEach(([num, name]) => {
     el.innerHTML += `
     <div class="agent-row" id="agent-row-${num}">
       <div class="agent-num">${num}</div>
@@ -505,11 +584,14 @@ async function startLaunch() {
 
   let completed = 0;
 
+  const competitors = document.getElementById('competitorsInput')?.value.trim() || '';
+  const keywords = document.getElementById('keywordsInput')?.value.trim() || '';
+
   try {
     const resp = await fetch('/api/launch', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({product_info: product})
+      body: JSON.stringify({product_info: product, competitors, keywords})
     });
 
     const reader = resp.body.getReader();

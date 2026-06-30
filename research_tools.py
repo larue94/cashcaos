@@ -1,6 +1,13 @@
 """
 $CCM Launch OS — Live Research Tools
-Pulls real market data from Google Trends, Reddit, G2, YouTube, LinkedIn (via Google)
+Pulls real market data from:
+  - Jina AI  (free, no key — semantic web search + URL reader)
+  - Tavily   (free tier 1000/mo — AI search for agents)
+  - Google Trends (free, pytrends)
+  - Reddit   (free public JSON API)
+  - G2 / Capterra (web scraping)
+  - YouTube  (scrape or API key)
+  - LinkedIn (via Jina/Google search)
 """
 
 import time
@@ -12,6 +19,164 @@ from urllib.parse import quote_plus
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 }
+
+
+# ──────────────────────────────────────────────
+# JINA AI  (100% free, no API key)
+# Closest open-source-spirit alternative to Exa
+# ──────────────────────────────────────────────
+
+def jina_search(query: str, num_results: int = 5) -> dict:
+    """
+    Semantic web search via Jina AI s.jina.ai — free, no key needed.
+    Returns full page content, not just snippets. Great for LinkedIn posts.
+    """
+    try:
+        url = f"https://s.jina.ai/{quote_plus(query)}"
+        r = requests.get(url, headers={**HEADERS, 'Accept': 'application/json',
+                                        'X-Return-Format': 'json'}, timeout=20)
+        if r.status_code == 200:
+            try:
+                data = r.json()
+                results = []
+                for item in (data.get('data') or data.get('results') or [])[:num_results]:
+                    results.append({
+                        'title': item.get('title', ''),
+                        'url': item.get('url', ''),
+                        'content': item.get('content', item.get('description', ''))[:600],
+                    })
+                return {'query': query, 'results': results, 'source': 'Jina AI s.jina.ai'}
+            except Exception:
+                # Jina also returns markdown — parse it
+                lines = r.text.split('\n')
+                results = []
+                current = {}
+                for line in lines:
+                    if line.startswith('Title:'):
+                        if current:
+                            results.append(current)
+                        current = {'title': line.replace('Title:', '').strip()}
+                    elif line.startswith('URL:'):
+                        current['url'] = line.replace('URL:', '').strip()
+                    elif line.startswith('Content:') or (current and 'title' in current and 'content' not in current):
+                        current['content'] = line[:600]
+                if current:
+                    results.append(current)
+                return {'query': query, 'results': results[:num_results], 'source': 'Jina AI s.jina.ai'}
+        return {'error': f'HTTP {r.status_code}', 'query': query}
+    except Exception as e:
+        return {'error': str(e), 'query': query}
+
+
+def jina_read_url(url: str) -> dict:
+    """
+    Read any URL and get clean markdown content via Jina r.jina.ai — free, no key.
+    Use this to read specific LinkedIn posts, G2 pages, Reddit threads, etc.
+    """
+    try:
+        read_url = f"https://r.jina.ai/{url}"
+        r = requests.get(read_url, headers=HEADERS, timeout=20)
+        if r.status_code == 200:
+            return {'url': url, 'content': r.text[:3000], 'source': 'Jina AI r.jina.ai'}
+        return {'error': f'HTTP {r.status_code}', 'url': url}
+    except Exception as e:
+        return {'error': str(e), 'url': url}
+
+
+def jina_linkedin_search(topic: str) -> dict:
+    """Search LinkedIn posts via Jina AI — free semantic search."""
+    results = []
+    queries = [
+        f"site:linkedin.com {topic} problem frustrated",
+        f"site:linkedin.com {topic} finally solution",
+        f"site:linkedin.com {topic} announcing launched",
+    ]
+    for q in queries:
+        r = jina_search(q, num_results=4)
+        for item in r.get('results', []):
+            if item.get('content') or item.get('title'):
+                results.append(item)
+        time.sleep(0.5)
+    return {'topic': topic, 'posts': results, 'source': 'Jina AI → LinkedIn'}
+
+
+# ──────────────────────────────────────────────
+# TAVILY  (free tier: 1000 searches/month)
+# Best structured AI search for agents
+# Sign up free at tavily.com
+# ──────────────────────────────────────────────
+
+def tavily_search(query: str, api_key: str, search_depth: str = 'basic',
+                  include_domains: list = None, max_results: int = 5) -> dict:
+    """
+    Tavily AI search — structured results with full content extraction.
+    Free tier: 1000 searches/month at tavily.com
+    search_depth: 'basic' (fast) or 'advanced' (deeper, uses more credits)
+    """
+    try:
+        payload = {
+            'api_key': api_key,
+            'query': query,
+            'search_depth': search_depth,
+            'max_results': max_results,
+            'include_answer': True,
+            'include_raw_content': False,
+        }
+        if include_domains:
+            payload['include_domains'] = include_domains
+
+        r = requests.post('https://api.tavily.com/search',
+                          json=payload, timeout=20)
+        if r.status_code == 200:
+            data = r.json()
+            return {
+                'query': query,
+                'answer': data.get('answer', ''),
+                'results': [
+                    {
+                        'title': item.get('title', ''),
+                        'url': item.get('url', ''),
+                        'content': item.get('content', '')[:600],
+                        'score': item.get('score', 0),
+                    }
+                    for item in data.get('results', [])
+                ],
+                'source': 'Tavily',
+            }
+        return {'error': f'HTTP {r.status_code}: {r.text[:200]}', 'query': query}
+    except Exception as e:
+        return {'error': str(e), 'query': query}
+
+
+def tavily_research_pack(topic: str, competitors: list, api_key: str) -> dict:
+    """Run a full Tavily research sweep across LinkedIn, Reddit, G2, and industry news."""
+    results = {}
+
+    results['linkedin'] = tavily_search(
+        f"{topic} professionals frustrated problems LinkedIn",
+        api_key, include_domains=['linkedin.com'], max_results=5
+    )
+    time.sleep(0.3)
+
+    results['reddit'] = tavily_search(
+        f"{topic} reddit complaints hate worst alternative",
+        api_key, include_domains=['reddit.com'], max_results=5
+    )
+    time.sleep(0.3)
+
+    results['industry'] = tavily_search(
+        f"{topic} market trends 2024 2025 growth problems",
+        api_key, max_results=5
+    )
+    time.sleep(0.3)
+
+    if competitors:
+        results['competitor_reviews'] = tavily_search(
+            f"{' OR '.join(competitors[:2])} reviews problems users hate",
+            api_key, include_domains=['g2.com', 'capterra.com', 'trustpilot.com'], max_results=5
+        )
+
+    return results
 
 
 # ──────────────────────────────────────────────
@@ -324,39 +489,55 @@ def _youtube_scrape(topic: str) -> dict:
 # MASTER RESEARCH RUNNER
 # ──────────────────────────────────────────────
 
-def run_full_research(product_info: str, competitors: list[str] = None,
-                      keywords: list[str] = None, youtube_api_key: str = None) -> dict:
+def run_full_research(product_info: str, competitors: list = None,
+                      keywords: list = None, youtube_api_key: str = None,
+                      tavily_api_key: str = None) -> dict:
     """
     Run all research tools and return a combined data package.
-    Feed this into the Claude research agents for much richer analysis.
+    Priority: Tavily (if key) → Jina AI (always free) → direct scrapers.
     """
     print("  📡  Running live research...")
 
-    # Extract keywords from product info if not provided
     if not keywords:
         words = [w.strip('.,!?') for w in product_info.split() if len(w) > 5]
         keywords = list(set(words[:5]))
 
-    topic = product_info[:80]
-
+    topic = product_info[:100]
     data = {}
 
+    # ── Tavily sweep (if key provided) ───────────
+    if tavily_api_key:
+        print("  🔍  Tavily AI search (LinkedIn, Reddit, G2)...")
+        data['tavily'] = tavily_research_pack(topic, competitors or [], tavily_api_key)
+    else:
+        data['tavily'] = {'note': 'No Tavily key — using Jina AI + direct scrapers'}
+
+    # ── Jina AI LinkedIn search (always free) ────
+    print("  💼  LinkedIn via Jina AI (free)...")
+    data['linkedin_jina'] = jina_linkedin_search(topic)
+
+    # ── Jina general search ──────────────────────
+    print("  🔎  Jina AI semantic search...")
+    data['jina_market'] = jina_search(f"{topic} problems users hate complaints 2024", num_results=5)
+    data['jina_viral'] = jina_search(f"{topic} viral launch X twitter announcement", num_results=5)
+
+    # ── Google Trends ────────────────────────────
     print("  📈  Google Trends...")
     data['google_trends'] = get_google_trends(keywords)
 
+    # ── Reddit ───────────────────────────────────
     print("  🔴  Reddit...")
     data['reddit'] = get_reddit_posts(topic)
 
+    # ── G2 / Capterra ────────────────────────────
     if competitors:
-        print(f"  ⭐  G2 reviews for {competitors[0]}...")
+        print(f"  ⭐  G2/Capterra for {competitors[0]}...")
         data['g2'] = scrape_g2_reviews(competitors[0])
         data['capterra'] = scrape_capterra_reviews(competitors[0])
     else:
-        data['g2'] = {"note": "No competitor specified — add competitor names for review scraping"}
+        data['g2'] = {'note': 'Add competitor names for G2/Capterra review scraping'}
 
-    print("  💼  LinkedIn (via Google)...")
-    data['linkedin'] = search_linkedin_via_google(topic)
-
+    # ── YouTube ──────────────────────────────────
     print("  ▶️  YouTube...")
     data['youtube'] = scrape_youtube_search(topic, youtube_api_key)
 
@@ -368,10 +549,55 @@ def format_research_for_claude(data: dict) -> str:
     """Format the raw research data into a clean brief for Claude agents."""
     parts = []
 
+    # Tavily AI search results
+    tavily = data.get('tavily', {})
+    if tavily and not tavily.get('note') and not tavily.get('error'):
+        tav_industry = tavily.get('industry', {})
+        if tav_industry.get('answer'):
+            parts.append("## TAVILY: MARKET INTELLIGENCE")
+            parts.append(tav_industry['answer'][:500])
+        tav_li = tavily.get('linkedin', {})
+        if tav_li.get('results'):
+            parts.append("\nLINKEDIN (via Tavily):")
+            for r in tav_li['results'][:4]:
+                parts.append(f"- {r.get('title', '')} — {r.get('content', '')[:200]}")
+        tav_reddit = tavily.get('reddit', {})
+        if tav_reddit.get('results'):
+            parts.append("\nREDDIT (via Tavily):")
+            for r in tav_reddit['results'][:4]:
+                parts.append(f"- {r.get('title', '')} — {r.get('content', '')[:200]}")
+        tav_reviews = tavily.get('competitor_reviews', {})
+        if tav_reviews.get('results'):
+            parts.append("\nCOMPETITOR REVIEWS (G2/Capterra via Tavily):")
+            for r in tav_reviews['results'][:4]:
+                parts.append(f"- {r.get('title', '')} — {r.get('content', '')[:200]}")
+
+    # Jina AI semantic search
+    jina_market = data.get('jina_market', {})
+    if jina_market.get('results'):
+        parts.append("\n## JINA AI: MARKET SIGNALS")
+        for r in jina_market['results'][:4]:
+            parts.append(f"- {r.get('title', '')} — {r.get('content', '')[:250]}")
+
+    jina_viral = data.get('jina_viral', {})
+    if jina_viral.get('results'):
+        parts.append("\n## JINA AI: VIRAL PATTERNS")
+        for r in jina_viral['results'][:4]:
+            parts.append(f"- {r.get('title', '')} — {r.get('content', '')[:250]}")
+
+    # Jina LinkedIn search
+    li_jina = data.get('linkedin_jina', {})
+    if li_jina.get('posts'):
+        parts.append("\n## LINKEDIN PROFESSIONAL DISCOURSE (Jina AI)")
+        for post in li_jina['posts'][:6]:
+            parts.append(f"- \"{post.get('title', '')}\"")
+            if post.get('content'):
+                parts.append(f"  → {post['content'][:200]}")
+
     # Google Trends
     gt = data.get('google_trends', {})
     if not gt.get('error'):
-        parts.append("## GOOGLE TRENDS")
+        parts.append("\n## GOOGLE TRENDS")
         for kw, stats in gt.get('interest_summary', {}).items():
             parts.append(f"- {kw}: {stats.get('trend', '?').upper()} (recent avg: {stats.get('recent', 0):.0f}/100)")
         rq = gt.get('related_queries', {})
@@ -403,15 +629,6 @@ def format_research_for_claude(data: dict) -> str:
             parts.append(f"✗ {con}")
         for snippet in g2.get('review_snippets', [])[:3]:
             parts.append(f"Quote: \"{snippet}\"")
-
-    # LinkedIn
-    linkedin = data.get('linkedin', {})
-    if not linkedin.get('error') and linkedin.get('posts'):
-        parts.append("\n## LINKEDIN PROFESSIONAL DISCOURSE")
-        for post in linkedin.get('posts', [])[:8]:
-            parts.append(f"- \"{post.get('title', '')}\"")
-            if post.get('snippet'):
-                parts.append(f"  → {post['snippet'][:200]}")
 
     # YouTube
     yt = data.get('youtube', {})
