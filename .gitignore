@@ -1,0 +1,23 @@
+# deps
+node_modules/
+.pnp
+.pnp.js
+
+# build
+.next/
+out/
+dist/
+
+# env
+.env
+.env.local
+.env.*.local
+
+# generated
+.prisma/
+prisma/migrations/
+
+# misc
+.DS_Store
+*.tsbuildinfo
+npm-debug.log*

@@ -1,0 +1,221 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth (NextAuth) ──────────────────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  accounts      Account[]
+  sessions      Session[]
+  org           Organization? @relation(fields: [orgId], references: [id])
+  orgId         String?
+}
+
+model Organization {
+  id          String       @id @default(cuid())
+  name        String
+  createdAt   DateTime     @default(now())
+  users       User[]
+  icpProfiles IcpProfile[]
+  leads       Lead[]
+  campaigns   Campaign[]
+}
+
+// ─── ICP ─────────────────────────────────────────────────────────────────────
+
+model IcpProfile {
+  id               String       @id @default(cuid())
+  orgId            String
+  org              Organization @relation(fields: [orgId], references: [id])
+  name             String       @default("Default ICP")
+  description      String       @db.Text
+  targetTitles     String[]
+  targetIndustries String[]
+  companySizeMin   Int?
+  companySizeMax   Int?
+  keywords         String[]
+  // JSON: { fit: number, intent: number, signals: Record<string, number> }
+  scoringWeights   Json         @default("{\"fit\": 60, \"intent\": 40}")
+  websiteUrl       String?
+  isActive         Boolean      @default(true)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+// ─── Leads ───────────────────────────────────────────────────────────────────
+
+model Lead {
+  id            String       @id @default(cuid())
+  orgId         String
+  org           Organization @relation(fields: [orgId], references: [id])
+  firstName     String?
+  lastName      String?
+  email         String?
+  title         String?
+  company       String?
+  domain        String?
+  linkedinUrl   String?
+  phone         String?
+  location      String?
+  industry      String?
+  companySize   String?
+  source        String       @default("manual") // csv | manual | webhook | apollo | clearbit
+  enrichmentRaw Json?        // raw enrichment response
+  fitScore      Float        @default(0)
+  intentScore   Float        @default(0)
+  totalScore    Float        @default(0)
+  tier          String       @default("Cold") // Hot | Warm | Cold
+  llmRationale  String?      @db.Text
+  status        String       @default("new") // new | contacted | replied | booked | disqualified
+  unsubscribed  Boolean      @default(false)
+  tags          String[]
+  customFields  Json?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  signals       Signal[]
+  messages      Message[]
+  activities    Activity[]
+}
+
+// ─── Signals ─────────────────────────────────────────────────────────────────
+
+model Signal {
+  id         String   @id @default(cuid())
+  leadId     String
+  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  type       String   // competitor_engagement | follows_company | hiring | tech_stack | website_visit | manual | webhook
+  source     String   // webhook | manual | apollo | clearbit | imported
+  payload    Json     @default("{}")
+  weight     Float    @default(1.0)
+  occurredAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+}
+
+// ─── Campaigns & Sequences ───────────────────────────────────────────────────
+
+model Campaign {
+  id            String         @id @default(cuid())
+  orgId         String
+  org           Organization   @relation(fields: [orgId], references: [id])
+  name          String
+  description   String?
+  channels      String[]       // email | linkedin | twitter
+  mode          String         @default("copilot") // auto | copilot
+  status        String         @default("draft")   // draft | active | paused | completed
+  segmentFilter Json?          // filter criteria applied to leads
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  steps         SequenceStep[]
+  messages      Message[]
+  enrollments   Enrollment[]
+}
+
+model SequenceStep {
+  id             String   @id @default(cuid())
+  campaignId     String
+  campaign       Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  order          Int
+  channel        String   // email | linkedin | twitter
+  subject        String?
+  template       String   @db.Text
+  delayDays      Int      @default(0)
+  aiPersonalize  Boolean  @default(true)
+  createdAt      DateTime @default(now())
+}
+
+model Enrollment {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  leadId     String
+  stepIndex  Int      @default(0)
+  status     String   @default("active") // active | paused | completed | unsubscribed
+  startedAt  DateTime @default(now())
+  nextSendAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([campaignId, leadId])
+}
+
+// ─── Messages ────────────────────────────────────────────────────────────────
+
+model Message {
+  id          String    @id @default(cuid())
+  leadId      String
+  lead        Lead      @relation(fields: [leadId], references: [id])
+  campaignId  String?
+  campaign    Campaign? @relation(fields: [campaignId], references: [id])
+  stepId      String?
+  channel     String    // email | linkedin | twitter
+  direction   String    // out | in
+  subject     String?
+  body        String    @db.Text
+  status      String    @default("draft") // draft | queued | sent | delivered | replied | failed
+  externalId  String?   // message-id from email provider or channel
+  threadId    String?   // for threading in inbox
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  openedAt    DateTime?
+  repliedAt   DateTime?
+  errorMsg    String?
+  metadata    Json?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// ─── Activities / Events ─────────────────────────────────────────────────────
+
+model Activity {
+  id        String   @id @default(cuid())
+  leadId    String?
+  lead      Lead?    @relation(fields: [leadId], references: [id])
+  type      String   // email_sent | email_opened | email_replied | signal_received | lead_scored | meeting_booked | status_changed
+  payload   Json     @default("{}")
+  createdAt DateTime @default(now())
+}
