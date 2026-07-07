@@ -1,0 +1,18 @@
+# Libraries for the agentic paper-trading system.
+# Install with:  pip install -r trading/requirements.txt
+
+# Broker connection (Alpaca paper trading)
+alpaca-py>=0.33.0
+
+# Reads settings (your API keys) from the .env file
+python-dotenv>=1.0.0
+
+# --- Used from Phase 2 onward (installed now so setup is one-time) ---
+# Market data & fundamentals
+yfinance>=0.2.50
+pandas>=2.0.0
+numpy>=1.26.0
+requests>=2.31.0
+
+# LLM reasoning layer (Claude API)
+anthropic>=0.40.0

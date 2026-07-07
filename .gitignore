@@ -1,0 +1,16 @@
+# Secret keys — never upload these
+.env
+trading/.env
+
+# Python clutter
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Local data and logs generated while the system runs
+trading/logs/*.log
+trading/logs/*.jsonl
+trading/data/cache/
+*.db
+*.sqlite
