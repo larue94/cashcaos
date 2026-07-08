@@ -69,6 +69,11 @@ class Recommendation:
         """The three agents' scores for one ticker (for the learning ledger)."""
         return {op.agent: op.score for op in self.opinions.get(ticker, [])}
 
+    def details_for(self, ticker: str) -> list[dict]:
+        """Full per-agent rationale for one ticker (for the web UI)."""
+        return [{"agent": op.agent, "score": op.score, "stance": op.stance,
+                 "notes": op.notes} for op in self.opinions.get(ticker, [])]
+
 
 def _opinions_text(ticker: str, opinions: list[Opinion]) -> str:
     lines = [f"=== {ticker} ==="]

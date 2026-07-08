@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trading OS — Cash &amp; Caos</title>
+<style>
+:root {
+  --surface:#fcfcfb; --page:#f4f1ea; --card:#ffffff; --ink:#0b0b0b;
+  --ink2:#52514e; --muted:#898781; --grid:#e1e0d9; --axis:#c3c2b7;
+  --brand:#1a3c2f; --series1:#2a78d6; --aqua:#1baf7a; --bench:#898781;
+  --good:#0ca30c; --warn:#fab219; --crit:#d03b3b;
+  --border:rgba(11,11,11,0.10); --shadow:0 1px 3px rgba(0,0,0,.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface:#1a1a19; --page:#0d0d0d; --card:#1a1a19; --ink:#fff;
+    --ink2:#c3c2b7; --muted:#898781; --grid:#2c2c2a; --axis:#383835;
+    --brand:#2f6b52; --series1:#3987e5; --aqua:#199e70; --bench:#898781;
+    --border:rgba(255,255,255,0.10); --shadow:0 1px 3px rgba(0,0,0,.4);
+  }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--page); color:var(--ink);
+       font-family:system-ui,-apple-system,"Segoe UI",sans-serif; }
+.top { background:var(--brand); color:#fff; padding:14px 22px;
+       display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+       position:sticky; top:0; z-index:20; }
+.top h1 { font-size:18px; margin:0; letter-spacing:.5px; font-weight:700; }
+.top .equity { font-size:26px; font-weight:700; margin-left:auto;
+               font-variant-numeric:tabular-nums; }
+.top .sub { font-size:12.5px; opacity:.85; }
+.dot { display:inline-block; width:8px; height:8px; border-radius:50%;
+       vertical-align:middle; margin-right:5px; }
+.dot.open { background:#4ade80; } .dot.closed { background:#fbbf24; }
+.dot.unknown { background:#9ca3af; }
+.wrap { max-width:1080px; margin:0 auto; padding:20px 18px 70px; }
+.toolbar { display:flex; gap:10px; flex-wrap:wrap; margin:6px 0 20px; }
+button { font-family:inherit; font-size:14px; cursor:pointer; border-radius:8px;
+         border:1px solid var(--border); padding:10px 16px; background:var(--card);
+         color:var(--ink); font-weight:600; transition:transform .05s; }
+button:active { transform:translateY(1px); }
+button:disabled { opacity:.5; cursor:default; }
+button.primary { background:var(--brand); color:#fff; border-color:transparent; }
+button.approve { background:var(--good); color:#fff; border-color:transparent; }
+button.reject { background:transparent; color:var(--crit); border-color:var(--crit); }
+h2 { font-size:19px; margin:30px 0 4px; }
+.hint { color:var(--ink2); font-size:13px; margin:0 0 12px; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:12px;
+        padding:16px 18px; margin:12px 0; box-shadow:var(--shadow); }
+.rec { border-left:4px solid var(--series1); }
+.rec.sell { border-left-color:var(--warn); }
+.rec-head { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.badge { font-size:12px; font-weight:700; padding:3px 10px; border-radius:6px;
+         color:#fff; background:var(--series1); }
+.badge.sell { background:var(--warn); color:#000; }
+.rec-title { font-size:17px; font-weight:700; }
+.rec-size { color:var(--ink2); font-size:14px; }
+.conf { margin-left:auto; font-size:12px; color:var(--muted); }
+.thesis { margin:10px 0 0; font-size:14.5px; line-height:1.5; }
+.rec-actions { display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+.linkbtn { background:none; border:none; color:var(--series1); font-weight:600;
+           padding:6px 0; cursor:pointer; font-size:13.5px; }
+.detail { margin-top:14px; padding-top:14px; border-top:1px solid var(--grid);
+          display:none; }
+.detail.open { display:block; }
+.agent { margin:12px 0; }
+.agent-row { display:flex; align-items:center; gap:10px; }
+.agent-name { width:88px; font-weight:600; font-size:13.5px; text-transform:capitalize; }
+.bar { flex:1; height:16px; background:var(--grid); border-radius:8px;
+       position:relative; overflow:hidden; }
+.bar .fill { position:absolute; top:0; bottom:0; left:50%; border-radius:8px; }
+.bar .mid { position:absolute; left:50%; top:0; bottom:0; width:1px;
+            background:var(--axis); }
+.agent-score { width:74px; text-align:right; font-variant-numeric:tabular-nums;
+               font-size:13px; }
+.notes { margin:4px 0 0 98px; font-size:12.5px; color:var(--ink2); }
+.notes li { margin:2px 0; }
+.rr { margin:10px 0; font-size:13.5px; line-height:1.5; }
+.rr b { color:var(--ink); }
+table { width:100%; border-collapse:collapse; font-size:13.5px; }
+th { text-align:left; color:var(--muted); font-weight:600; font-size:12px;
+     padding:7px 8px; border-bottom:1px solid var(--grid); }
+td { padding:8px; border-bottom:1px solid var(--grid);
+     font-variant-numeric:tabular-nums; }
+tr:last-child td { border-bottom:none; }
+.pos { color:var(--good); font-weight:600; } .neg { color:var(--crit); font-weight:600; }
+.pill { font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px;
+        border:1px solid var(--border); }
+.chart-legend { display:flex; gap:16px; font-size:12.5px; color:var(--ink2);
+                margin:8px 0; flex-wrap:wrap; }
+.sw { display:inline-block; width:14px; height:3px; border-radius:2px;
+      vertical-align:middle; margin-right:5px; }
+.empty { color:var(--ink2); font-size:14px; padding:6px 0; }
+#toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+         background:var(--brand); color:#fff; padding:12px 20px; border-radius:10px;
+         box-shadow:0 4px 16px rgba(0,0,0,.25); font-size:14px; z-index:50;
+         display:none; max-width:90%; }
+#overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:40;
+           display:none; align-items:center; justify-content:center; padding:20px; }
+.modal { background:var(--card); border-radius:12px; padding:22px; max-width:600px;
+         width:100%; max-height:80vh; overflow:auto; }
+.modal h3 { margin:0 0 8px; }
+.modal pre { white-space:pre-wrap; font-size:12.5px; line-height:1.5;
+             background:var(--page); padding:12px; border-radius:8px;
+             color:var(--ink2); max-height:50vh; overflow:auto; }
+.spinner { display:inline-block; width:14px; height:14px; border:2px solid #fff;
+           border-top-color:transparent; border-radius:50%; animation:spin .7s linear infinite;
+           vertical-align:middle; margin-right:8px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.scroll { overflow-x:auto; }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>⚂ CASH &amp; CAOS · TRADING OS</h1>
+  <div style="line-height:1.3">
+    <div class="sub"><span id="mkt-dot" class="dot unknown"></span>
+      <span id="mkt-text">connecting…</span></div>
+    <div class="sub">Paper trading · simulated money</div>
+  </div>
+  <div style="text-align:right">
+    <div class="equity" id="equity">—</div>
+    <div class="sub" id="equity-sub"></div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="toolbar">
+    <button class="primary" id="btn-digest" onclick="runJob('digest')">
+      ▶ Run today's analysis</button>
+    <button id="btn-review" onclick="runJob('review')">📋 Weekly review</button>
+    <button onclick="loadState()">↻ Refresh</button>
+  </div>
+
+  <h2>Awaiting your approval</h2>
+  <p class="hint">Nothing is bought or sold until you click Approve. Each card
+    shows the full reasoning — tap “View the analysis” to see every agent's
+    take and the price chart. Recommendations expire after 3 days.</p>
+  <div id="pending"></div>
+
+  <h2>Your paper account</h2>
+  <div class="card">
+    <div class="chart-legend"><span><span class="sw"
+      style="background:var(--series1)"></span>Account value over time</span></div>
+    <div id="equity-chart"></div>
+    <div style="height:8px"></div>
+    <div class="scroll"><table id="positions"></table></div>
+  </div>
+
+  <h2>Agent report card <span class="hint" style="font-weight:400">— the
+    learning loop</span></h2>
+  <p class="hint" id="weights-note"></p>
+  <div class="card scroll"><table id="report-card"></table></div>
+
+  <h2>Completed trades</h2>
+  <div class="card scroll"><table id="outcomes"></table></div>
+
+  <p class="hint" style="margin-top:30px">Full backtest results &amp; institutional
+    metrics live in a separate page — open
+    <code>trading/dashboard/output/dashboard.html</code> in your browser.</p>
+</div>
+
+<div id="toast"></div>
+<div id="overlay"><div class="modal">
+  <h3 id="modal-title">Working…</h3>
+  <div id="modal-body"></div>
+</div></div>
+
+<script>
+const $ = s => document.querySelector(s);
+function toast(msg, ms=4000){ const t=$("#toast"); t.textContent=msg;
+  t.style.display="block"; clearTimeout(t._t);
+  t._t=setTimeout(()=>t.style.display="none", ms); }
+function fmt$(n){ return "$"+Number(n).toLocaleString(undefined,
+  {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function fmtPct(x){ return (x>=0?"+":"")+(x*100).toFixed(1)+"%"; }
+
+let STATE=null;
+
+async function loadState(){
+  try {
+    const r = await fetch("/api/state"); const j = await r.json();
+    if(!j.ok){ toast("Could not load: "+j.message); return; }
+    STATE = j.state; render();
+  } catch(e){ toast("Server not reachable — is it still running?"); }
+}
+
+function render(){
+  const a = STATE.account;
+  $("#equity").textContent = fmt$(a.equity);
+  const cls = a.change>=0?"pos":"neg";
+  $("#equity-sub").innerHTML = `<span style="color:#fff">${fmtPct(a.change)} `+
+    `since start · ${fmt$(a.cash)} cash</span>`;
+  const dot=$("#mkt-dot"), txt=$("#mkt-text");
+  if(a.market_open===true){ dot.className="dot open"; txt.textContent="Market open"; }
+  else if(a.market_open===false){ dot.className="dot closed"; txt.textContent="Market closed"; }
+  else { dot.className="dot unknown"; txt.textContent="Market status unknown"; }
+  renderPending(); renderPositions(); renderReportCard();
+  renderOutcomes(); renderEquity();
+}
+
+function renderPending(){
+  const box=$("#pending"); const recs=STATE.pending;
+  if(!recs.length){ box.innerHTML =
+    `<div class="card"><div class="empty">Nothing awaits your approval right now.
+     Click “Run today's analysis” to look for a new idea.</div></div>`; return; }
+  box.innerHTML = recs.map(r => {
+    const sell = r.action==="sell";
+    const size = r.dollars ? `${r.shares} shares (~${fmt$(r.dollars)})`
+                           : `${r.shares} shares`;
+    return `<div class="card rec ${sell?'sell':''}">
+      <div class="rec-head">
+        <span class="badge ${sell?'sell':''}">${r.action.toUpperCase()}</span>
+        <span class="rec-title">${r.ticker}</span>
+        <span class="rec-size">${size}${r.book?` · ${r.book} book`:''}</span>
+        ${r.confidence?`<span class="conf">confidence: ${r.confidence}</span>`:''}
+      </div>
+      <p class="thesis">${escapeHtml(r.thesis||'')}</p>
+      <button class="linkbtn" onclick="toggleDetail(${r.id})"
+        id="tgl-${r.id}">▾ View the analysis</button>
+      <div class="detail" id="detail-${r.id}"></div>
+      <div class="rec-actions">
+        <button class="approve" onclick="approve(${r.id},'${r.ticker}')">
+          ✓ Approve &amp; send order</button>
+        <button class="reject" onclick="reject(${r.id})">✗ Reject</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function toggleDetail(id){
+  const d=$("#detail-"+id), t=$("#tgl-"+id);
+  if(d.classList.contains("open")){ d.classList.remove("open");
+    t.textContent="▾ View the analysis"; return; }
+  d.classList.add("open"); t.textContent="▴ Hide the analysis";
+  const r = STATE.pending.find(x=>x.id===id);
+  d.innerHTML = renderAgents(r) +
+    `<div class="rr"><b>Why now:</b> ${escapeHtml(r.thesis||'')}</div>`+
+    (r.risks?`<div class="rr"><b>What could go wrong:</b> ${escapeHtml(r.risks)}</div>`:'')+
+    (r.exit_plan&&r.exit_plan!=='—'?`<div class="rr"><b>Exit plan:</b> ${escapeHtml(r.exit_plan)}</div>`:'')+
+    `<div class="chart-legend">
+       <span><span class="sw" style="background:var(--series1)"></span>Price</span>
+       <span><span class="sw" style="background:var(--aqua)"></span>50-day avg (medium trend)</span>
+       <span><span class="sw" style="background:var(--bench)"></span>200-day avg (long trend)</span>
+     </div><div id="chart-${id}"><div class="empty">Loading price chart…</div></div>`;
+  loadChart(id, r.ticker);
+}
+
+function renderAgents(r){
+  if(!r.agent_details||!r.agent_details.length){
+    // fall back to scores only
+    const s=r.scores; let out='';
+    for(const a of ['research','technical','sentiment'])
+      if(s[a]!=null) out+=agentBar(a,s[a],null);
+    return out||'<div class="empty">No agent detail stored for this one.</div>';
+  }
+  return r.agent_details.map(a=>agentBar(a.agent,a.score,a.notes)).join("");
+}
+function agentBar(name,score,notes){
+  const from50 = score-50; const w=Math.abs(from50); // 0..50
+  const color = score>=60?'var(--good)':score<=40?'var(--crit)':'var(--muted)';
+  const left = from50>=0 ? '50%' : (50-w)+'%';
+  const label = score>=60?'bullish':score<=40?'bearish':'neutral';
+  const notesHtml = notes&&notes.length ?
+    `<ul class="notes">${notes.map(n=>`<li>${escapeHtml(n)}</li>`).join("")}</ul>`:'';
+  return `<div class="agent"><div class="agent-row">
+     <span class="agent-name">${name}</span>
+     <span class="bar"><span class="mid"></span>
+       <span class="fill" style="left:${left}; width:${w}%; background:${color}"></span></span>
+     <span class="agent-score">${score} · ${label}</span>
+   </div>${notesHtml}</div>`;
+}
+
+async function loadChart(id, ticker){
+  try {
+    const r=await fetch("/api/chart/"+ticker); const j=await r.json();
+    if(!j.ok){ $("#chart-"+id).innerHTML=`<div class="empty">Chart unavailable: ${j.message}</div>`; return; }
+    $("#chart-"+id).innerHTML = lineChart(j.chart);
+  } catch(e){ $("#chart-"+id).innerHTML=`<div class="empty">Chart failed to load.</div>`; }
+}
+
+function lineChart(c){
+  const W=940,H=280,L=52,R=16,T=12,B=26;
+  const series=[["close",c.close,"var(--series1)",2,null],
+                ["sma50",c.sma50,"var(--aqua)",1.5,"4 3"],
+                ["sma200",c.sma200,"var(--bench)",1.5,"5 4"]];
+  const all=[].concat(...series.map(s=>s[1].filter(v=>v!=null)));
+  const lo=Math.min(...all)*0.98, hi=Math.max(...all)*1.02, n=c.close.length;
+  const sx=i=>L+(W-L-R)*i/(n-1), sy=v=>T+(H-T-B)*(1-(v-lo)/(hi-lo));
+  const path=arr=>{ let d="",up=false;
+    arr.forEach((v,i)=>{ if(v==null){up=false;return;}
+      d+=(up?"L":"M")+sx(i).toFixed(1)+","+sy(v).toFixed(1)+" "; up=true; }); return d; };
+  let grid="",step=Math.max(1,Math.round((hi-lo)/4));
+  for(let v=Math.ceil(lo/step)*step; v<hi; v+=step){
+    grid+=`<line x1="${L}" y1="${sy(v).toFixed(1)}" x2="${W-R}" y2="${sy(v).toFixed(1)}"
+      stroke="var(--grid)"/><text x="${L-6}" y="${(sy(v)+4).toFixed(1)}"
+      text-anchor="end" font-size="10" fill="var(--muted)">$${v}</text>`; }
+  let xl="",seen={};
+  c.dates.forEach((d,i)=>{ const y=d.slice(0,4);
+    if(!seen[y]){ seen[y]=1; xl+=`<text x="${sx(i).toFixed(1)}" y="${H-8}"
+      font-size="10" fill="var(--muted)">${y}</text>`; }});
+  const lines=series.map(s=>`<path d="${path(s[1])}" fill="none" stroke="${s[2]}"
+     stroke-width="${s[3]}" ${s[4]?`stroke-dasharray="${s[4]}"`:''}/>`).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%">${grid}
+    <line x1="${L}" y1="${H-B}" x2="${W-R}" y2="${H-B}" stroke="var(--axis)"/>
+    ${lines}${xl}</svg>`;
+}
+
+function renderPositions(){
+  const t=$("#positions"); const p=STATE.positions;
+  if(!p.length){ t.innerHTML=`<tr><td class="empty">No positions held yet —
+    the account is all cash.</td></tr>`; return; }
+  t.innerHTML=`<tr><th>Stock</th><th>Shares</th><th>Bought at</th><th>Now</th>
+    <th>Worth</th><th>Profit / Loss</th></tr>`+
+    p.map(x=>`<tr><td><b>${x.symbol}</b></td><td>${x.qty}</td>
+      <td>${fmt$(x.avg_entry)}</td><td>${fmt$(x.current)}</td>
+      <td>${fmt$(x.value)}</td>
+      <td class="${x.pl>=0?'pos':'neg'}">${fmtPct(x.pl_pct)} (${x.pl>=0?'+':''}${fmt$(x.pl)})</td>
+    </tr>`).join("");
+}
+
+function renderReportCard(){
+  $("#weights-note").textContent = STATE.weights_note;
+  const t=$("#report-card");
+  t.innerHTML=`<tr><th>Agent</th><th>Last 30 trades</th><th>Last 90</th>
+    <th>Last 365</th><th>Current voice</th></tr>`+
+    STATE.report_card.map(r=>{
+      const cell=w=>{ const c=r.windows[w];
+        return c.accuracy==null?'—':`${Math.round(c.accuracy*100)}% (${c.right}/${c.graded})`; };
+      return `<tr><td style="text-transform:capitalize"><b>${r.agent}</b></td>
+        <td>${cell('30')}</td><td>${cell('90')}</td><td>${cell('365')}</td>
+        <td><span class="pill">${r.weight}×</span></td></tr>`;
+    }).join("");
+}
+
+function renderOutcomes(){
+  const t=$("#outcomes"); const o=STATE.outcomes;
+  if(!o.length){ t.innerHTML=`<tr><td class="empty">No completed trades yet —
+    results appear once a position is bought AND sold.</td></tr>`; return; }
+  t.innerHTML=`<tr><th>Stock</th><th>Book</th><th>In</th><th>Out</th>
+    <th>Held</th><th>Result</th></tr>`+
+    o.map(x=>`<tr><td><b>${x.ticker}</b></td><td>${x.book||'—'}</td>
+      <td>${fmt$(x.entry)}</td><td>${fmt$(x.exit)}</td>
+      <td>${Math.round(x.days)}d</td>
+      <td class="${x.return>=0?'pos':'neg'}">${fmtPct(x.return)}</td></tr>`).join("");
+}
+
+function renderEquity(){
+  const h=STATE.equity_history; const box=$("#equity-chart");
+  if(h.length<2){ box.innerHTML=`<div class="empty">Your account-value line
+    appears after a couple of daily runs (one point per day).</div>`; return; }
+  const W=940,H=140,L=52,R=16,T=10,B=22, v=h.map(x=>x.equity);
+  const lo=Math.min(...v)*0.999, hi=Math.max(...v)*1.001, n=v.length;
+  const sx=i=>L+(W-L-R)*i/(n-1), sy=x=>T+(H-T-B)*(1-(x-lo)/((hi-lo)||1));
+  const pts=v.map((x,i)=>sx(i).toFixed(1)+","+sy(x).toFixed(1)).join(" ");
+  box.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%">
+    <polyline points="${pts}" fill="none" stroke="var(--series1)" stroke-width="2"/>
+    <text x="${L}" y="${H-6}" font-size="10" fill="var(--muted)">${h[0].date}</text>
+    <text x="${W-R}" y="${H-6}" text-anchor="end" font-size="10"
+      fill="var(--muted)">${h[h.length-1].date}</text></svg>`;
+}
+
+async function approve(id, ticker){
+  if(!confirm(`Send a REAL paper-trading order for ${ticker}?\n\n`+
+    `This uses simulated money only, but it will place the order on your `+
+    `Alpaca paper account. Continue?`)) return;
+  const r=await fetch("/api/approve/"+id,{method:"POST"});
+  const j=await r.json(); toast(j.message, 6000); loadState();
+}
+async function reject(id){
+  if(!confirm("Reject this recommendation? Nothing will be sent.")) return;
+  const r=await fetch("/api/reject/"+id,{method:"POST"});
+  const j=await r.json(); toast(j.message); loadState();
+}
+
+async function runJob(kind){
+  $("#btn-digest").disabled=true; $("#btn-review").disabled=true;
+  const label = kind==="digest"?"Running today's analysis":"Writing the weekly review";
+  showModal(label+"…",
+    `<p class="hint">This takes a minute or two — real market data and AI
+     reasoning are running. You can watch the progress below.</p>
+     <pre id="joblog">starting…</pre>`);
+  const r=await fetch("/api/run/"+kind,{method:"POST"}); const j=await r.json();
+  if(!j.ok){ hideModal(); toast(j.message); reenable(); return; }
+  poll();
+}
+async function poll(){
+  const r=await fetch("/api/job"); const j=await r.json();
+  const log=$("#joblog"); if(log) log.textContent=j.log||"working…";
+  if(log) log.scrollTop=log.scrollHeight;
+  if(j.running){ setTimeout(poll,1200); return; }
+  reenable();
+  if(j.error){ $("#modal-title").textContent="Something went wrong";
+    if(log) log.textContent += "\n\nERROR: "+j.error; }
+  else { $("#modal-title").textContent =
+    (j.kind==="review"?"Weekly review complete":"Analysis complete")+" ✓"; }
+  const body=$("#modal-body");
+  body.innerHTML += `<div style="margin-top:12px;text-align:right">
+    <button class="primary" onclick="hideModal();loadState()">Done</button></div>`;
+  loadState();
+}
+function reenable(){ $("#btn-digest").disabled=false; $("#btn-review").disabled=false; }
+function showModal(title,body){ $("#modal-title").textContent=title;
+  $("#modal-body").innerHTML=body; $("#overlay").style.display="flex"; }
+function hideModal(){ $("#overlay").style.display="none"; }
+function escapeHtml(s){ return (s||'').replace(/[&<>"]/g,
+  c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+loadState();
+setInterval(loadState, 60000); // auto-refresh once a minute
+</script>
+</body>
+</html>

@@ -174,7 +174,30 @@ data coverage, overfitting) sit at the top.
 
 ---
 
-## Your daily routine (from Phase 5 onward)
+## The easy way — the clickable app (recommended)
+
+```
+python -m trading.webapp
+```
+
+Then open **http://127.0.0.1:8787** in any web browser. One window shows
+everything and lets you do everything with buttons — no terminal typing:
+
+- your account value, positions, and equity chart
+- each recommendation as a card with a **✓ Approve & send order** and
+  **✗ Reject** button
+- **“View the analysis”** on each card expands the full reasoning: every
+  agent's score and notes, the plain-English why / risks / exit plan, and a
+  price chart with the 50-day and 200-day trend lines
+- big buttons to **▶ Run today's analysis** and **📋 Weekly review**
+- the agent report card and completed-trades history
+
+It runs only on your own computer (nothing is exposed to the internet), and
+every button uses the exact same rules and broker path as the commands
+below — the app is just a friendlier face on the identical engine. Approving
+still asks you to confirm before any order is sent.
+
+## The command-line way (same engine, no browser)
 
 ```
 python -m trading.digest     # each market morning (~3 minutes)

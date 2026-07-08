@@ -168,7 +168,8 @@ def main() -> int:
                     dollars=rec.dollars, ref_price=rec.price,
                     confidence=rec.confidence, thesis=rec.thesis,
                     risks=rec.what_could_go_wrong, exit_plan=rec.exit_plan,
-                    scores=rec.scores_for(rec.ticker))
+                    scores=rec.scores_for(rec.ticker),
+                    agent_details=rec.details_for(rec.ticker))
             elif rec.action == "vetoed":
                 say(f"  Team wanted {rec.ticker}, but the risk agent vetoed it.")
             else:

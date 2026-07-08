@@ -16,3 +16,6 @@ requests>=2.31.0
 
 # LLM reasoning layer (Claude API)
 anthropic>=0.40.0
+
+# The clickable local web app (python -m trading.webapp)
+flask>=3.0.0

@@ -77,23 +77,37 @@ def connect() -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     conn.executescript(_SCHEMA)
+    _migrate(conn)
     return conn
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Add columns introduced after the first DB was created."""
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(recommendations)")}
+    if "agent_details" not in cols:
+        # JSON: [{"agent","score","stance","notes":[...]}] — the full per-agent
+        # rationale, so the web UI can show WHY without re-running the team.
+        conn.execute("ALTER TABLE recommendations ADD COLUMN agent_details TEXT")
+        conn.commit()
 
 
 # ---------- recommendations ----------
 
 def save_recommendation(conn, *, ticker, action, book, shares, dollars,
                         ref_price, confidence, thesis, risks, exit_plan,
-                        scores: dict, closes_rec_id=None) -> int:
+                        scores: dict, closes_rec_id=None,
+                        agent_details=None) -> int:
+    import json as _json
     cur = conn.execute(
         """INSERT INTO recommendations
            (created_at, ticker, action, book, shares, dollars, ref_price,
             confidence, thesis, risks, exit_plan, research_score,
-            technical_score, sentiment_score, closes_rec_id)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            technical_score, sentiment_score, closes_rec_id, agent_details)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (_now(), ticker, action, book, shares, dollars, ref_price, confidence,
          thesis, risks, exit_plan, scores.get("research"),
-         scores.get("technical"), scores.get("sentiment"), closes_rec_id))
+         scores.get("technical"), scores.get("sentiment"), closes_rec_id,
+         _json.dumps(agent_details) if agent_details else None))
     conn.commit()
     return cur.lastrowid
 
