@@ -248,8 +248,30 @@ function toggleDetail(id){
        <span><span class="sw" style="background:var(--series1)"></span>Price</span>
        <span><span class="sw" style="background:var(--aqua)"></span>50-day avg (medium trend)</span>
        <span><span class="sw" style="background:var(--bench)"></span>200-day avg (long trend)</span>
-     </div><div id="chart-${id}"><div class="empty">Loading price chart…</div></div>`;
+     </div><div id="chart-${id}"><div class="empty">Loading price chart…</div></div>
+     <div style="margin-top:12px">
+       <button class="linkbtn" onclick="loadDeep('${r.ticker}', ${id})"
+         id="deepbtn-${id}">📊 Show deep analysis (fundamentals, technicals,
+         Fibonacci, Elliott Wave)</button>
+       <pre id="deep-${id}" style="display:none; white-space:pre-wrap;
+         font-size:12.5px; line-height:1.5; background:var(--page);
+         padding:12px; border-radius:8px; color:var(--ink2);
+         overflow-x:auto"></pre>
+     </div>`;
   loadChart(id, r.ticker);
+}
+
+async function loadDeep(ticker, id){
+  const pre=$("#deep-"+id), btn=$("#deepbtn-"+id);
+  if(pre.style.display==="block"){ pre.style.display="none";
+    btn.textContent="📊 Show deep analysis (fundamentals, technicals, Fibonacci, Elliott Wave)";
+    return; }
+  pre.style.display="block"; pre.textContent="Crunching the numbers…";
+  btn.textContent="📊 Hide deep analysis";
+  try {
+    const r=await fetch("/api/deep/"+ticker); const j=await r.json();
+    pre.textContent = j.ok ? j.deep.text : ("Couldn't load: "+j.message);
+  } catch(e){ pre.textContent="Failed to load deep analysis."; }
 }
 
 function renderAgents(r){

@@ -119,6 +119,38 @@ class Bot:
     def _is_owner(self, chat_id) -> bool:
         return self.owner is not None and str(chat_id) == str(self.owner)
 
+    def _send_long(self, chat_id, text: str) -> None:
+        """Send text as HTML, split into Telegram-sized chunks at line breaks."""
+        esc = TelegramClient.esc(text)
+        limit = 3800
+        chunk = ""
+        for line in esc.split("\n"):
+            if len(chunk) + len(line) + 1 > limit:
+                self.tg.send(chat_id, f"<pre>{chunk}</pre>")
+                chunk = ""
+            chunk += line + "\n"
+        if chunk.strip():
+            self.tg.send(chat_id, f"<pre>{chunk}</pre>")
+
+    def _send_deep(self, chat_id, ticker: str, r=None) -> None:
+        """Compute and send the full fundamentals + technicals + Fib + Elliott."""
+        # A quick one-line agent verdict header, then the deep report.
+        if r is not None:
+            header = (f"Agent scores — research {r['research_score']}, "
+                      f"technical {r['technical_score']}, "
+                      f"sentiment {r['sentiment_score']} (0-100, 50=neutral).")
+            self.tg.send(chat_id, TelegramClient.esc(header))
+        try:
+            from trading.agents.deep_analysis import deep_report, format_report
+            self.tg.send(chat_id, "⏳ Crunching fundamentals, technicals, "
+                         "Fibonacci and wave structure…")
+            report = format_report(deep_report(ticker))
+            self._send_long(chat_id, report)
+        except Exception as e:  # noqa: BLE001
+            self.tg.send(chat_id, "Couldn't build the deep analysis right now "
+                         f"({TelegramClient.esc(str(e))}). Price data services "
+                         "sometimes rate-limit — try again in a minute.")
+
     # --- pushing recommendations ---
     def push_pending(self) -> int:
         if not self.owner:
@@ -190,9 +222,9 @@ class Bot:
             with store.connect() as conn:
                 r = conn.execute("SELECT * FROM recommendations WHERE id=?",
                                  (rec_id,)).fetchone()
+            self.tg.answer_callback(cq_id, "Building the deep analysis…")
             if r:
-                self.tg.send(chat_id, _detail_text(r))
-            self.tg.answer_callback(cq_id)
+                self._send_deep(chat_id, r["ticker"], r)
         elif action == "ap" and rec_id:
             # Ask for a confirming second tap before sending a real order.
             with store.connect() as conn:
@@ -266,8 +298,19 @@ class Bot:
                          "/pending — show trades awaiting your approval\n"
                          "/status — account value &amp; open positions\n"
                          "/digest — run the analysis right now\n"
+                         "/analyze TICKER — deep analysis of any stock "
+                         "(e.g. /analyze AAPL): full fundamentals, technicals, "
+                         "Fibonacci levels and a tentative Elliott-Wave read\n"
                          "Every recommendation arrives with Approve/Reject "
                          "buttons. Nothing trades without your tap.")
+        elif text.startswith("/analyze"):
+            parts = text.split()
+            if len(parts) < 2:
+                self.tg.send(chat_id, "Give me a ticker, e.g. /analyze AAPL")
+            else:
+                ticker = parts[1].upper().lstrip("$")
+                threading.Thread(target=self._send_deep,
+                                 args=(chat_id, ticker), daemon=True).start()
         elif text.startswith("/pending"):
             n = self.push_pending()
             with store.connect() as conn:

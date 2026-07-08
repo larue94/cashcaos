@@ -68,6 +68,14 @@ def api_chart(ticker):
         return jsonify({"ok": False, "message": str(e)}), 200
 
 
+@app.route("/api/deep/<ticker>")
+def api_deep(ticker):
+    try:
+        return jsonify({"ok": True, "deep": actions.deep_analysis(ticker)})
+    except Exception as e:  # noqa: BLE001
+        return jsonify({"ok": False, "message": str(e)}), 200
+
+
 @app.route("/api/approve/<int:rec_id>", methods=["POST"])
 def api_approve(rec_id):
     return jsonify(actions.approve(rec_id))

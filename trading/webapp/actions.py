@@ -68,6 +68,12 @@ def reject(rec_id: int, reason: str = "") -> dict:
         return {"ok": True, "message": "Rejected and recorded. Nothing sent."}
 
 
+def deep_analysis(ticker: str) -> dict:
+    """The full fundamentals + technicals + Fibonacci + Elliott report as text."""
+    from trading.agents.deep_analysis import deep_report, format_report
+    return {"ticker": ticker.upper(), "text": format_report(deep_report(ticker))}
+
+
 def chart_data(ticker: str, days: int = 260) -> dict:
     """Recent price history with trend overlays, for the detail chart."""
     df, source = get_daily_prices(ticker)
