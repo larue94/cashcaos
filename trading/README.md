@@ -44,9 +44,9 @@ There is **no day trading** anywhere in the system.
 - [x] Phase 2 — Data pipeline (prices, fundamentals, news)
 - [x] Phase 3 — The 4 agents + orchestrator, first example recommendation
 - [x] Phase 4 — Backtesting with walk-forward windows + metrics dashboard
-- [x] **Phase 5 — Daily digest + your approval workflow + learning loop** ← *you are here*
-- [ ] Phase 6 — Risk calibration: regimes, correlation limits, Kelly sizing,
-      Monte Carlo, small-cap screener (backtested honestly, losers included)
+- [x] Phase 5 — Daily digest + your approval workflow + learning loop
+- [x] **Phase 6 — Risk calibration: regimes, correlation limits, Kelly sizing,
+      Monte Carlo, small-cap screener (backtested honestly, losers included)** ← *complete*
 
 ---
 
@@ -219,9 +219,44 @@ python -m trading.review     # once a week, e.g. Saturday
   their influence automatically (0.3x–1.2x). All of it persists in a local
   database (`trading/data/cache/journal.db`) so learning survives restarts.
 
+**Phase 6 — risk calibration report:**
+
+```
+python -m trading.test_risk
+```
+
+**What you should see:** a full risk report (console + a browser page at
+`trading/dashboard/output/risk.html`) covering all five risk tools:
+
+1. **Market regime** — today's classification (bull / choppy / bear) and a
+   table of how each book actually performed in each regime historically.
+   The live agents now weight signals by regime automatically.
+2. **Correlation limits** — the Risk agent blocks a buy that would pile onto
+   a cluster of holdings that all move together, or overload one sector.
+3. **Kelly sizing** — position size from each book's real win rate and payoff
+   (half-Kelly, hard-capped); flat 5% until a book has 20+ closed trades.
+4. **Monte Carlo risk-of-ruin** — each book's real returns reshuffled
+   thousands of times; the % of those alternate histories that breach the
+   20% drawdown limit (honestly, that's 12–35% — which is exactly why the
+   circuit breaker and these limits exist).
+5. **High-risk small-cap sleeve** — the runner-pattern screener backtested
+   with every losing signal included, a full win/loss histogram, and an
+   honest verdict (it will say "not justified" if the numbers say so).
+
+These run as analysis/config; the regime, correlation, and Kelly rules are
+already wired into the live daily digest.
+
 ---
 
 ## What could break
+
+### Phase 6 (risk calibration)
+
+- **Small-cap results are optimistic** — free data omits bankrupt/delisted
+  companies (survivorship bias) and the "catalyst" is proxied by a price
+  gap. The report says this loudly; treat the sleeve as a small experiment.
+- **Monte Carlo is an estimate**, not a promise — it resamples the past, and
+  the future can be worse than any past the data contains.
 
 ### Phase 5 (digest / approval / learning)
 

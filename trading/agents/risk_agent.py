@@ -3,13 +3,12 @@
 Pure rules, no AI, no exceptions:
 1. Circuit breaker: if the account has fallen 20%+ from its all-time peak,
    ALL new buying is vetoed until you review the situation.
-2. Position cap: no single position may exceed 5% of the account (the flat
-   cap that applies until Phase 6 adds Kelly sizing from real trade history).
-3. Sanity checks: refuses to size a trade with a stale/absent price.
-
-Phase 6 adds: sector/factor correlation limits, Kelly-criterion sizing,
-Monte Carlo risk-of-ruin. The veto mechanism built here is what they'll
-plug into.
+2. Correlation limit (Phase 6): vetoes a buy that would pile onto a cluster
+   of holdings that all move together, or overload one sector.
+3. Position sizing: Kelly-criterion (half-Kelly) from the book's ACTUAL win
+   rate and payoff once it has enough closed trades; the flat 5% cap until
+   then. Always hard-capped.
+4. Sanity checks: refuses to size a trade with a stale/absent price.
 
 The account's all-time peak (the "high-water mark") is remembered in a small
 local file so drawdown is measured across sessions.
@@ -21,6 +20,7 @@ from dataclasses import dataclass
 from trading.audit_log import log_event
 from trading.broker.base import AccountSnapshot
 from trading.config import get_settings
+from trading.risk import correlation, kelly
 
 
 @dataclass
@@ -49,9 +49,19 @@ def _high_water_mark(current_equity: float) -> float:
     return hwm
 
 
-def assess(account: AccountSnapshot, ticker: str, price: float) -> RiskVerdict:
+def assess(account: AccountSnapshot, ticker: str, price: float,
+           book: str | None = None, current_tickers: list[str] | None = None,
+           prices=None, book_trade_returns: list[float] | None = None,
+           max_position_fraction: float | None = None) -> RiskVerdict:
+    """Judge and size a proposed BUY. Extra args (all optional) enable the
+    Phase 6 rules; without them it behaves like the Phase 3 flat-cap version.
+
+    max_position_fraction lets the small-cap sleeve pass its own wider cap.
+    """
     settings = get_settings()
     reasons: list[str] = []
+    cap_fraction = (max_position_fraction if max_position_fraction is not None
+                    else settings.max_position_fraction)
 
     # Rule 1: the 20% drawdown circuit breaker.
     hwm = _high_water_mark(account.equity)
@@ -71,19 +81,43 @@ def assess(account: AccountSnapshot, ticker: str, price: float) -> RiskVerdict:
         f"(limit {settings.max_drawdown_core * 100:.0f}%)."
     )
 
-    # Rule 3: sanity check the price before doing math with it.
+    # Rule 2: correlation & sector limits (only if we know current holdings).
+    if current_tickers and prices is not None:
+        allowed, corr_reasons = correlation.check(ticker, current_tickers, prices)
+        reasons.extend(corr_reasons)
+        if not allowed:
+            verdict = RiskVerdict(False, ticker, 0.0, 0, reasons)
+            _log(verdict)
+            return verdict
+
+    # Rule 4: sanity check the price before doing math with it.
     if not price or price <= 0:
         reasons.append(f"VETO — no reliable current price for {ticker}.")
         verdict = RiskVerdict(False, ticker, 0.0, 0, reasons)
         _log(verdict)
         return verdict
 
-    # Rule 2: the 5% position cap.
-    cap_dollars = account.equity * settings.max_position_fraction
+    # Rule 3: position sizing — Kelly (half) once there's history, else flat cap.
+    if book_trade_returns is not None:
+        fraction, size_reason = kelly.position_fraction(
+            book_trade_returns, flat=cap_fraction, cap=max(cap_fraction, 0.10))
+    else:
+        fraction, size_reason = cap_fraction, (
+            f"Flat {cap_fraction * 100:.0f}% cap (no closed-trade history "
+            "wired in for this call).")
+    reasons.append(size_reason)
+
+    if fraction <= 0:
+        reasons.append(f"VETO — sizing came out at 0% for {ticker}.")
+        verdict = RiskVerdict(False, ticker, 0.0, 0, reasons)
+        _log(verdict)
+        return verdict
+
+    cap_dollars = account.equity * fraction
     shares = int(cap_dollars // price)
     if shares < 1:
         reasons.append(
-            f"VETO — even the {settings.max_position_fraction * 100:.0f}% cap "
+            f"VETO — even a {fraction * 100:.1f}% position "
             f"(${cap_dollars:,.0f}) doesn't buy one share at ${price:,.2f}."
         )
         verdict = RiskVerdict(False, ticker, 0.0, 0, reasons)
@@ -91,10 +125,8 @@ def assess(account: AccountSnapshot, ticker: str, price: float) -> RiskVerdict:
         return verdict
     dollars = round(shares * price, 2)
     reasons.append(
-        f"Sized at the flat {settings.max_position_fraction * 100:.0f}% cap: "
-        f"{shares} shares x ${price:,.2f} = ${dollars:,.0f} "
-        f"({dollars / account.equity * 100:.1f}% of the account). "
-        "(Kelly-based sizing arrives in Phase 6 once there is real trade history.)"
+        f"Final size: {shares} shares x ${price:,.2f} = ${dollars:,.0f} "
+        f"({dollars / account.equity * 100:.1f}% of the account)."
     )
 
     verdict = RiskVerdict(True, ticker, dollars, shares, reasons)

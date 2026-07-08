@@ -156,9 +156,14 @@ tr:last-child td { border-bottom:none; }
   <h2>Completed trades</h2>
   <div class="card scroll"><table id="outcomes"></table></div>
 
-  <p class="hint" style="margin-top:30px">Full backtest results &amp; institutional
-    metrics live in a separate page — open
-    <code>trading/dashboard/output/dashboard.html</code> in your browser.</p>
+  <p class="hint" style="margin-top:30px">Deeper reports open in your browser
+    as separate pages:<br>
+    · <code>trading/dashboard/output/dashboard.html</code> — full backtest
+    results &amp; institutional metrics<br>
+    · <code>trading/dashboard/output/risk.html</code> — risk calibration
+    (regimes, Kelly sizing, Monte Carlo, small-cap sleeve)<br>
+    Regenerate them anytime with <code>python -m trading.test_backtest</code>
+    and <code>python -m trading.test_risk</code>.</p>
 </div>
 
 <div id="toast"></div>

@@ -93,6 +93,51 @@ def _parse_reply(reply: str) -> dict:
     return json.loads(match.group(0))
 
 
+def _detect_regime():
+    """Today's market regime from SPY, with a safe fallback."""
+    try:
+        from trading.data.prices import get_daily_prices
+        from trading.risk import regime
+        df, _ = get_daily_prices("SPY")
+        return regime.current_regime(df["Close"])
+    except Exception as e:  # noqa: BLE001
+        return "unknown", {"explain": f"Regime unavailable ({e})."}
+
+
+def _risk_inputs(book: str):
+    """Gather what the Risk agent's Phase 6 rules need: current holdings, a
+    price table for correlation, and this book's real closed-trade returns."""
+    import pandas as pd
+
+    current_tickers: list[str] = []
+    prices = None
+    book_returns: list[float] | None = None
+    try:
+        broker = get_broker()
+        current_tickers = [p.symbol for p in broker.get_positions()]
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        with store.connect() as conn:
+            rows = conn.execute(
+                "SELECT return_pct FROM outcomes WHERE book=? ORDER BY id",
+                (book,)).fetchall()
+            book_returns = [r["return_pct"] for r in rows]
+    except Exception:  # noqa: BLE001
+        book_returns = None
+    if current_tickers:
+        try:
+            from trading.data.prices import get_daily_prices
+            cols = {}
+            for t in set(current_tickers):
+                df, _ = get_daily_prices(t)
+                cols[t] = df["Close"]
+            prices = pd.DataFrame(cols).dropna()
+        except Exception:  # noqa: BLE001
+            prices = None
+    return current_tickers, prices, book_returns
+
+
 def run(watchlist: list[str], verbose: bool = True) -> Recommendation:
     """Analyze the watchlist and produce one human-readable recommendation."""
 
@@ -109,6 +154,13 @@ def run(watchlist: list[str], verbose: bool = True) -> Recommendation:
         w = ledger.weights(conn)
     log_event("orchestrator", "agent-weights", ledger.weights_note(w),
               data=dict(w))
+
+    # Market regime: agents lean differently in a bull vs choppy vs bear market.
+    regime_label, regime_info = _detect_regime()
+    say(f"  Market regime: {regime_label.upper()} — {regime_info['explain']}")
+    log_event("orchestrator", "regime",
+              f"Market regime is {regime_label}. {regime_info['explain']}",
+              data=regime_info)
 
     edgar = EdgarClient()
     all_opinions: dict[str, list[Opinion]] = {}
@@ -156,9 +208,15 @@ def run(watchlist: list[str], verbose: bool = True) -> Recommendation:
     say("  Asking the HIGH reasoning tier to weigh the evidence...")
 
     evidence = "\n\n".join(_opinions_text(t, all_opinions[t]) for t in shortlist)
+    regime_context = (
+        f"Current market regime: {regime_label.upper()}. {regime_info['explain']}\n"
+        "Weight the evidence accordingly: in a bull regime, trend/momentum "
+        "signals are more trustworthy; in a choppy or bear regime, demand "
+        "stronger fundamentals, be more willing to choose 'none', and prefer "
+        "the longer-horizon books.\n\n")
     reply = ask("high", _SYSTEM,
-                "Here is your team's evidence. Choose the single best "
-                "recommendation (or none):\n\n" + evidence)
+                regime_context + "Here is your team's evidence. Choose the "
+                "single best recommendation (or none):\n\n" + evidence)
     parsed = _parse_reply(reply)
 
     rec = Recommendation(
@@ -178,13 +236,20 @@ def run(watchlist: list[str], verbose: bool = True) -> Recommendation:
         return rec
 
     # The Risk agent has the last word — veto power over everything.
-    say("  Risk agent reviewing the proposal...")
+    say("  Risk agent reviewing the proposal (correlation + Kelly sizing)...")
     tech_data = next((o.data for o in all_opinions.get(rec.ticker, [])
                       if o.agent == "technical"), {})
     price = float(tech_data.get("price", 0))
     broker = get_broker()
     account = broker.get_account()
-    verdict = risk_agent.assess(account, rec.ticker, price)
+
+    # Feed the Risk agent current holdings (for correlation limits), recent
+    # prices, and this book's real closed-trade history (for Kelly sizing).
+    current_tickers, prices, book_returns = _risk_inputs(rec.strategy_book)
+    verdict = risk_agent.assess(
+        account, rec.ticker, price, book=rec.strategy_book,
+        current_tickers=current_tickers, prices=prices,
+        book_trade_returns=book_returns)
     rec.risk_notes = verdict.reasons
     if not verdict.approved:
         rec.action = "vetoed"
