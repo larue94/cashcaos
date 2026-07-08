@@ -1,32 +1,32 @@
 """The AI reasoning layer — two tiers of "brain", routed by task difficulty.
 
-HIGH tier (judgment calls; default: Claude Opus, Anthropic's most capable
-widely available model tier for this kind of reasoning):
+HIGH tier (judgment calls; Claude — default Claude Opus):
   - weighing the four agents' evidence into a final recommendation
   - writing the daily digest you approve or reject
   - the Risk agent's veto narratives and the weekly self-review
 
-LOW tier (grunt work; default: Claude Haiku, ~5x cheaper):
+LOW tier (grunt work; ALWAYS an open-source model, never Claude):
   - summarizing news headlines into one-line sentiment notes
   - extracting catalysts ("FDA approval", "contract win") from articles
   - reformatting text
 
-Important honesty note: most of this system's number-crunching (indicators,
-screeners, portfolio metrics, backtests) uses NO AI model at all — it's plain
-math, which is free, instant, and never hallucinates. The AI tiers are only
-used where actual reading and reasoning is required.
+The LOW tier speaks the standard "OpenAI-compatible" protocol, which nearly
+every open-source model service understands. Two free ways to run it:
 
-Open-source models: the LOW tier can be pointed at any server that speaks the
-common "OpenAI-compatible" protocol (Ollama running Llama/Qwen on your own
-computer, or hosted services like OpenRouter). Set in .env:
-    LLM_LOW_PROVIDER=openai-compatible
-    LLM_LOW_BASE_URL=http://localhost:11434/v1   (Ollama example)
-    LLM_LOW_MODEL=llama3.1:8b
-The HIGH tier stays on Claude — final trade reasoning is exactly where model
-quality pays for itself.
+  1. Groq (hosted, free tier, no computer requirements — the default):
+     get a free key at https://console.groq.com and put it in trading/.env
+     as LLM_LOW_API_KEY. Default model: Llama 3.3 70B.
+  2. Ollama (runs on YOUR computer, fully free and private):
+     install from https://ollama.com, run `ollama pull llama3.1:8b`, then in
+     trading/.env set LLM_LOW_BASE_URL=http://localhost:11434/v1 and
+     LLM_LOW_MODEL=llama3.1:8b (no API key needed).
 
-Every call's token usage and estimated cost is written to the audit log, so
-you can always see what the AI layer is costing you.
+Honesty note: most of this system's number-crunching (indicators, screeners,
+portfolio metrics, backtests) uses NO AI model at all — plain math, free and
+never hallucinating. The AI tiers only handle actual reading and reasoning.
+
+Every call's token usage (and estimated cost, where it has one) is written to
+the audit log, so you can always see what the AI layer is costing you.
 """
 
 import requests as _requests
@@ -39,7 +39,6 @@ from trading.config import Settings, get_settings
 _PRICES_PER_MTOK = {
     "claude-opus-4-8": (5.00, 25.00),
     "claude-sonnet-5": (3.00, 15.00),
-    "claude-haiku-4-5": (1.00, 5.00),
 }
 
 
@@ -52,6 +51,22 @@ class MissingClaudeKey(Exception):
         )
 
 
+class LowTierNotConfigured(Exception):
+    """The open-source model for grunt-work tasks isn't set up yet."""
+
+    def __init__(self):
+        super().__init__(
+            "The open-source model (LOW tier) isn't set up yet. Two free "
+            "options:\n"
+            "  1. Groq (hosted, easiest): free key from https://console.groq.com"
+            " -> paste into trading/.env as LLM_LOW_API_KEY=\n"
+            "  2. Ollama (on your own computer): install from https://ollama.com,"
+            " run `ollama pull llama3.1:8b`, then set in trading/.env:\n"
+            "     LLM_LOW_BASE_URL=http://localhost:11434/v1\n"
+            "     LLM_LOW_MODEL=llama3.1:8b"
+        )
+
+
 def _estimated_cost(model: str, tokens_in: int, tokens_out: int) -> float | None:
     prices = _PRICES_PER_MTOK.get(model)
     if not prices:
@@ -59,12 +74,13 @@ def _estimated_cost(model: str, tokens_in: int, tokens_out: int) -> float | None
     return tokens_in / 1e6 * prices[0] + tokens_out / 1e6 * prices[1]
 
 
-def _ask_anthropic(settings: Settings, model: str, system: str, prompt: str,
-                   max_tokens: int) -> str:
+def _ask_claude(settings: Settings, system: str, prompt: str, max_tokens: int) -> str:
+    """HIGH tier: judgment calls go to Claude."""
     if not settings.anthropic_api_key.strip():
         raise MissingClaudeKey()
     import anthropic
 
+    model = settings.llm_high_model
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
     response = client.messages.create(
         model=model,
@@ -80,40 +96,57 @@ def _ask_anthropic(settings: Settings, model: str, system: str, prompt: str,
     log_event(
         actor="llm",
         event="model-call",
-        detail=(f"Called {model}: {response.usage.input_tokens} tokens in, "
+        detail=(f"HIGH tier ({model}): {response.usage.input_tokens} tokens in, "
                 f"{response.usage.output_tokens} out"
                 + (f", estimated cost ${cost:.4f}" if cost is not None else "")),
-        data={"model": model, "tokens_in": response.usage.input_tokens,
+        data={"tier": "high", "model": model,
+              "tokens_in": response.usage.input_tokens,
               "tokens_out": response.usage.output_tokens, "est_cost_usd": cost},
     )
     return text
 
 
-def _ask_openai_compatible(settings: Settings, system: str, prompt: str,
-                           max_tokens: int) -> str:
-    """Talk to an open-source model server (Ollama, OpenRouter, LM Studio...)."""
-    if not settings.llm_low_base_url.strip():
-        raise ValueError(
-            "LLM_LOW_PROVIDER is 'openai-compatible' but LLM_LOW_BASE_URL is "
-            "blank in trading/.env — set it to your model server's address "
-            "(e.g. http://localhost:11434/v1 for Ollama)."
-        )
+def _is_local_server(base_url: str) -> bool:
+    return "localhost" in base_url or "127.0.0.1" in base_url
+
+
+def _ask_open_source(settings: Settings, system: str, prompt: str, max_tokens: int) -> str:
+    """LOW tier: grunt work goes to an open-source model."""
+    base_url = settings.llm_low_base_url.strip()
+    # A hosted service needs a key; a local Ollama server doesn't.
+    if not base_url or (not settings.llm_low_api_key.strip()
+                        and not _is_local_server(base_url)):
+        raise LowTierNotConfigured()
     headers = {"Content-Type": "application/json"}
     if settings.llm_low_api_key.strip():
         headers["Authorization"] = f"Bearer {settings.llm_low_api_key}"
-    resp = _requests.post(
-        settings.llm_low_base_url.rstrip("/") + "/chat/completions",
-        headers=headers,
-        json={
-            "model": settings.llm_low_model,
-            "max_tokens": max_tokens,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": prompt},
-            ],
-        },
-        timeout=120,
-    )
+    try:
+        resp = _requests.post(
+            base_url.rstrip("/") + "/chat/completions",
+            headers=headers,
+            json={
+                "model": settings.llm_low_model,
+                "max_tokens": max_tokens,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": prompt},
+                ],
+            },
+            timeout=120,
+        )
+    except _requests.exceptions.ConnectionError as e:
+        if _is_local_server(base_url):
+            raise RuntimeError(
+                "Could not reach your local model server at "
+                f"{base_url}. Is Ollama running? (Open the Ollama app, or run "
+                "`ollama serve` in a terminal.)"
+            ) from e
+        raise
+    if resp.status_code == 401:
+        raise ValueError(
+            "The open-source model service rejected the key — re-check the "
+            "LLM_LOW_API_KEY line in trading/.env for typos."
+        )
     resp.raise_for_status()
     data = resp.json()
     text = data["choices"][0]["message"]["content"]
@@ -121,11 +154,11 @@ def _ask_openai_compatible(settings: Settings, system: str, prompt: str,
     log_event(
         actor="llm",
         event="model-call",
-        detail=(f"Called open-source model {settings.llm_low_model} via "
-                f"{settings.llm_low_base_url}: "
+        detail=(f"LOW tier (open-source {settings.llm_low_model} via {base_url}): "
                 f"{usage.get('prompt_tokens', '?')} tokens in, "
-                f"{usage.get('completion_tokens', '?')} out"),
-        data={"model": settings.llm_low_model, "provider": "openai-compatible",
+                f"{usage.get('completion_tokens', '?')} out, cost $0 (free tier)"),
+        data={"tier": "low", "model": settings.llm_low_model,
+              "provider": base_url,
               "tokens_in": usage.get("prompt_tokens"),
               "tokens_out": usage.get("completion_tokens")},
     )
@@ -135,17 +168,14 @@ def _ask_openai_compatible(settings: Settings, system: str, prompt: str,
 def ask(tier: str, system: str, prompt: str, max_tokens: int | None = None) -> str:
     """Ask the AI a question, routed by tier.
 
-    tier: "high" for judgment calls, "low" for grunt work.
+    tier: "high" for judgment calls (Claude), "low" for grunt work
+          (open-source model).
     system: standing instructions (who the model is, rules it must follow).
     prompt: the actual question/material.
     """
     settings = get_settings()
     if tier == "high":
-        return _ask_anthropic(settings, settings.llm_high_model, system, prompt,
-                              max_tokens or 8000)
+        return _ask_claude(settings, system, prompt, max_tokens or 8000)
     if tier == "low":
-        if settings.llm_low_provider == "openai-compatible":
-            return _ask_openai_compatible(settings, system, prompt, max_tokens or 2000)
-        return _ask_anthropic(settings, settings.llm_low_model, system, prompt,
-                              max_tokens or 2000)
+        return _ask_open_source(settings, system, prompt, max_tokens or 2000)
     raise ValueError(f"tier must be 'high' or 'low', got {tier!r}")

@@ -45,13 +45,14 @@ class Settings:
     # risk narratives, the weekly self-review.
     llm_high_model: str = field(default_factory=lambda: os.getenv("LLM_HIGH_MODEL", "claude-opus-4-8"))
     # LOW tier: grunt work — summarizing headlines, extracting catalysts,
-    # formatting. Cheap and fast.
-    llm_low_model: str = field(default_factory=lambda: os.getenv("LLM_LOW_MODEL", "claude-haiku-4-5"))
-    # The LOW tier can be pointed at an open-source model server instead of
-    # Claude: set LLM_LOW_PROVIDER=openai-compatible plus LLM_LOW_BASE_URL
-    # (e.g. http://localhost:11434/v1 for Ollama) and optionally LLM_LOW_API_KEY.
-    llm_low_provider: str = field(default_factory=lambda: os.getenv("LLM_LOW_PROVIDER", "anthropic"))
-    llm_low_base_url: str = field(default_factory=lambda: os.getenv("LLM_LOW_BASE_URL", ""))
+    # formatting. Always an OPEN-SOURCE model (never Claude), reached through
+    # the standard "OpenAI-compatible" protocol. Defaults target Groq's free
+    # hosted tier; point LLM_LOW_BASE_URL at http://localhost:11434/v1 to use
+    # Ollama running on your own computer instead.
+    llm_low_model: str = field(default_factory=lambda: os.getenv("LLM_LOW_MODEL", "llama-3.3-70b-versatile"))
+    llm_low_base_url: str = field(
+        default_factory=lambda: os.getenv("LLM_LOW_BASE_URL", "https://api.groq.com/openai/v1")
+    )
     llm_low_api_key: str = field(default_factory=lambda: os.getenv("LLM_LOW_API_KEY", ""))
 
     # --- Data pipeline ---
