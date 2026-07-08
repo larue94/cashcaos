@@ -41,8 +41,8 @@ There is **no day trading** anywhere in the system.
 ## Build phases (where we are)
 
 - [x] Phase 1 — Skeleton + Alpaca connection test
-- [x] **Phase 2 — Data pipeline (prices, fundamentals, news)** ← *you are here*
-- [ ] Phase 3 — The 4 agents + orchestrator, first example recommendation
+- [x] Phase 2 — Data pipeline (prices, fundamentals, news)
+- [x] **Phase 3 — The 4 agents + orchestrator, first example recommendation** ← *you are here*
 - [ ] Phase 4 — Backtesting with walk-forward windows + metrics dashboard
 - [ ] Phase 5 — Daily digest + your approval workflow + learning loop
 - [ ] Phase 6 — Risk calibration: regimes, correlation limits, Kelly sizing,
@@ -138,9 +138,38 @@ prices (Apple and the S&P 500 as guinea pigs), company fundamentals
 news headlines. News shows a ⚠️ skip note until you add the free Finnhub
 key (Step 4 above) — that's expected, not a failure.
 
+**Phase 3 — the agent team (needs all keys set up):**
+
+```
+python -m trading.test_agents
+```
+
+**What you should see:** the team analyzes a small watchlist (takes a couple
+of minutes — real data, real AI reasoning), then prints ONE recommendation in
+plain English: what to buy, how much, which strategy book, why, what could go
+wrong, and when it would sell — or an honest "do nothing today". The Risk
+agent's sizing/veto reasoning is shown too. **Nothing is executed** — orders
+can only ever happen through the Phase 5 approval workflow, after you say yes
+to each trade.
+
+The AI setup: judgment calls use Claude (HIGH tier); news-reading grunt work
+uses a free open-source model, Llama 3.3 70B via Groq's free tier (LOW tier).
+Model choices can be changed in `.env` — including pointing the LOW tier at
+Ollama on your own computer (see `.env.example`).
+
 ---
 
 ## What could break
+
+### Phase 3 (agent team)
+
+- **A key stops working** — every key-related failure prints which line of
+  `.env` to fix.
+- **Groq free-tier limits** — very generous, but if you run the analysis many
+  times in one day it can briefly say "rate limited"; wait a minute and rerun.
+- **AI judgment is not a guarantee** — the reasoning is real but can still be
+  wrong; that's exactly why every trade waits for your approval and why the
+  Phase 5 learning loop tracks each agent's accuracy over time.
 
 ### Phase 2 (data pipeline)
 
