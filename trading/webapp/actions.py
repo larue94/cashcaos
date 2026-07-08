@@ -124,8 +124,27 @@ def full_state() -> dict:
                 if r["agent_details"] else [],
             })
 
+    # Headline backtest + risk metrics, if the reports have been generated.
+    from pathlib import Path
+    reports = Path(__file__).resolve().parent.parent / "dashboard" / "output"
+    metrics_summary = risk_summary = None
+    try:
+        p = reports / "summary.json"
+        if p.exists():
+            metrics_summary = json.loads(p.read_text())
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        p = reports / "risk_summary.json"
+        if p.exists():
+            risk_summary = json.loads(p.read_text())
+    except Exception:  # noqa: BLE001
+        pass
+
     start_equity = history[0]["equity"] if history else account.equity
     return {
+        "metrics_summary": metrics_summary,
+        "risk_summary": risk_summary,
         "account": {
             "equity": account.equity, "cash": account.cash,
             "buying_power": account.buying_power,

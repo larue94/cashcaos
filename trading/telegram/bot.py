@@ -141,9 +141,18 @@ class Bot:
                       f"sentiment {r['sentiment_score']} (0-100, 50=neutral).")
             self.tg.send(chat_id, TelegramClient.esc(header))
         try:
-            from trading.agents.deep_analysis import deep_report, format_report
+            from trading.agents.deep_analysis import (chart_image, deep_report,
+                                                      format_report)
             self.tg.send(chat_id, "⏳ Crunching fundamentals, technicals, "
                          "Fibonacci and wave structure…")
+            # Draw and send the technical chart image first.
+            try:
+                png = chart_image(ticker)
+                self.tg.send_photo(chat_id, png,
+                                   f"{ticker.upper()} — price, moving averages, "
+                                   "Fibonacci levels and RSI")
+            except Exception:  # noqa: BLE001 — chart is a bonus, keep going
+                pass
             report = format_report(deep_report(ticker))
             self._send_long(chat_id, report)
         except Exception as e:  # noqa: BLE001

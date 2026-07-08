@@ -15,6 +15,8 @@ Honesty, stated up front and repeated in the output:
   as experimental everywhere it appears.
 """
 
+import io
+
 import numpy as np
 import pandas as pd
 
@@ -212,9 +214,15 @@ def deep_report(ticker: str) -> dict:
     hi52 = float(df["High"].tail(252).max())
     lo52 = float(df["Low"].tail(252).min())
 
+    try:
+        statements = EdgarClient().financial_statements(ticker)
+    except Exception:  # noqa: BLE001
+        statements = None
+
     return {
         "ticker": ticker.upper(), "price": price,
         "fundamentals": fundamentals_block(ticker),
+        "statements": statements,
         "tech": {
             "price": price, "sma20": sma20, "sma50": sma50, "sma200": sma200,
             "sma200w": sma200w,
@@ -229,6 +237,69 @@ def deep_report(ticker: str) -> dict:
     }
 
 
+def chart_image(ticker: str, days: int = 300) -> bytes:
+    """Draw a real technical chart (price + moving averages + Fibonacci + RSI)
+    as a PNG, returned as bytes — for sending to Telegram or saving."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.dates as mdates
+    import matplotlib.pyplot as plt
+
+    df, _ = get_daily_prices(ticker)
+    hist = df.tail(days + 200)
+    close = hist["Close"]
+    sma50 = close.rolling(50).mean()
+    sma200 = close.rolling(200).mean()
+    rsi = _rsi(close)
+    view = hist.tail(days)
+    fib = fibonacci(df)
+
+    plt.style.use("dark_background")
+    fig, (ax, axr) = plt.subplots(
+        2, 1, figsize=(10, 6.4), sharex=True,
+        gridspec_kw={"height_ratios": [3, 1], "hspace": 0.08})
+    fig.patch.set_facecolor("#171a19")
+    for a in (ax, axr):
+        a.set_facecolor("#171a19")
+        a.grid(color="#2a2f2c", linewidth=0.6)
+        for s in a.spines.values():
+            s.set_color("#2a2f2c")
+        a.tick_params(colors="#aeb6b0", labelsize=8)
+
+    idx = view.index
+    ax.plot(idx, view["Close"], color="#4a95e8", linewidth=1.8, label="Price")
+    ax.plot(idx, sma50.tail(days), color="#22b985", linewidth=1.1,
+            linestyle="--", label="50-day avg")
+    ax.plot(idx, sma200.tail(days), color="#e0a542", linewidth=1.1,
+            linestyle="--", label="200-day avg")
+    # Fibonacci levels as faint horizontal lines
+    if fib.get("ok"):
+        for r, lvl in fib["levels"].items():
+            if view["Low"].min() * 0.97 <= lvl <= view["High"].max() * 1.03:
+                ax.axhline(lvl, color="#8b877c", linewidth=0.6, alpha=0.5)
+                ax.text(idx[-1], lvl, f" {r * 100:.1f}%", color="#8b877c",
+                        fontsize=7, va="center")
+    ax.set_title(f"{ticker.upper()} — price, moving averages & Fibonacci levels",
+                 color="#eef1ee", fontsize=12, loc="left")
+    ax.legend(loc="upper left", fontsize=8, facecolor="#1c201e",
+              edgecolor="#2a2f2c", labelcolor="#eef1ee")
+    ax.set_ylabel("Price ($)", color="#aeb6b0", fontsize=9)
+
+    axr.plot(idx, rsi.tail(days), color="#c58af0", linewidth=1.2)
+    axr.axhline(70, color="#e26b5d", linewidth=0.7, linestyle=":")
+    axr.axhline(30, color="#3fbf62", linewidth=0.7, linestyle=":")
+    axr.set_ylim(0, 100)
+    axr.set_ylabel("RSI", color="#aeb6b0", fontsize=9)
+    axr.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
+    axr.xaxis.set_major_formatter(mdates.DateFormatter("%b '%y"))
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=110, bbox_inches="tight",
+                facecolor="#171a19")
+    plt.close(fig)
+    return buf.getvalue()
+
+
 def format_report(rep: dict) -> str:
     """Plain-English multi-section text (for Telegram / the web app)."""
     t = rep["tech"]
@@ -237,6 +308,45 @@ def format_report(rep: dict) -> str:
     lines.append("— FUNDAMENTALS (what the business is worth) —")
     lines += rep["fundamentals"]
     lines.append("")
+
+    st = rep.get("statements")
+    if st:
+        def row(label, key, unit="B"):
+            vals = st.get(key) or []
+            if not vals:
+                return None
+            years = [str(y) for y, _ in vals]
+            if unit == "$":  # per-share
+                nums = [f"${v:,.2f}" for _, v in vals]
+            else:
+                nums = [f"${v / 1e9:,.1f}B" for _, v in vals]
+            return f"  {label:<20} " + "  ".join(
+                f"{y}:{n}" for y, n in zip(years, nums))
+
+        lines.append("— INCOME STATEMENT (SEC-filed, annual) —")
+        for lbl, key in [("Revenue", "revenue"), ("Gross profit", "gross_profit"),
+                         ("Operating income", "operating_income"),
+                         ("Net income", "net_income")]:
+            r = row(lbl, key)
+            if r:
+                lines.append(r)
+        eps = row("Diluted EPS", "eps_diluted", unit="$")
+        if eps:
+            lines.append(eps)
+        lines.append("")
+        lines.append("— BALANCE SHEET (SEC-filed, annual) —")
+        for lbl, key in [("Total assets", "total_assets"),
+                         ("Total liabilities", "total_liabilities"),
+                         ("Shareholder equity", "equity"), ("Cash", "cash"),
+                         ("Long-term debt", "long_term_debt")]:
+            r = row(lbl, key)
+            if r:
+                lines.append(r)
+        ocf = row("Operating cash flow", "operating_cash_flow")
+        if ocf:
+            lines.append("— CASH FLOW —")
+            lines.append(ocf)
+        lines.append("")
 
     lines.append("— TECHNICALS (what the chart is doing) —")
     trend = ("uptrend" if t["sma50"] > t["sma200"] else "downtrend")
@@ -293,4 +403,17 @@ def format_report(rep: dict) -> str:
                  "the same chart, and no tool labels them authoritatively. This "
                  "is a mechanical talking point, NOT a prediction. Do not size a "
                  "trade on it.")
+    lines.append("")
+    lines.append("— SOURCES (review them yourself) —")
+    st = rep.get("statements")
+    if st:
+        cik = st.get("cik")
+        lines.append(f"Financials: {st.get('company', rep['ticker'])} official "
+                     "SEC 10-K filings, via data.sec.gov (EDGAR).")
+        lines.append(f"  Filings: https://www.sec.gov/cgi-bin/browse-edgar?"
+                     f"action=getcompany&company={rep['ticker']}&type=10-K")
+    lines.append("Prices/technicals: daily price history (Yahoo Finance / "
+                 "Alpaca), computed in-house.")
+    lines.append("Live stats (P/E, margins): Yahoo Finance. "
+                 "News mood: Finnhub.")
     return "\n".join(lines)

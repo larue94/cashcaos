@@ -148,3 +148,52 @@ class EdgarClient:
             ]),
             "net_income": yearly(["NetIncomeLoss"]),
         }
+
+    def financial_statements(self, symbol: str) -> dict:
+        """Officially filed income statement + balance sheet, recent years.
+
+        Returns a dict of {line_item: [(fiscal_year, dollars), ...]} pulled
+        straight from the company's own SEC filings — the authoritative source
+        an analyst would review. Newest first, up to 4 years each.
+        """
+        cik = self.cik_for(symbol)
+        if cik is None:
+            raise ValueError(f"'{symbol}' isn't in SEC EDGAR (fund/ETF or "
+                             "non-US company).")
+        facts = self._get_json(
+            _EDGAR_FACTS_URL.format(cik=cik), f"edgar_facts_{symbol.upper()}.json",
+            max_age_days=7)
+        gaap = facts.get("facts", {}).get("us-gaap", {})
+
+        def yearly(tags, unit="USD"):
+            for tag in tags:
+                units = gaap.get(tag, {}).get("units", {}).get(unit, [])
+                rows = {}
+                for u in units:
+                    if u.get("form") == "10-K" and u.get("fp") == "FY" and u.get("fy"):
+                        rows[int(u["fy"])] = float(u["val"])
+                if rows:
+                    return sorted(rows.items(), reverse=True)[:4]
+            return []
+
+        return {
+            "company": facts.get("entityName", symbol.upper()),
+            # Income statement
+            "revenue": yearly(["RevenueFromContractWithCustomerExcludingAssessedTax",
+                               "Revenues", "SalesRevenueNet"]),
+            "gross_profit": yearly(["GrossProfit"]),
+            "operating_income": yearly(["OperatingIncomeLoss"]),
+            "net_income": yearly(["NetIncomeLoss"]),
+            "eps_diluted": yearly(["EarningsPerShareDiluted"], unit="USD/shares"),
+            # Balance sheet
+            "total_assets": yearly(["Assets"]),
+            "total_liabilities": yearly(["Liabilities"]),
+            "equity": yearly(["StockholdersEquity",
+                              "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"]),
+            "cash": yearly(["CashAndCashEquivalentsAtCarryingValue",
+                            "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"]),
+            "long_term_debt": yearly(["LongTermDebtNoncurrent", "LongTermDebt"]),
+            # Cash flow
+            "operating_cash_flow": yearly(
+                ["NetCashProvidedByUsedInOperatingActivities"]),
+        }

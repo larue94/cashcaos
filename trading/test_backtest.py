@@ -87,6 +87,18 @@ def main() -> int:
 
     corr = pd.DataFrame(book_returns).corr().round(2)
 
+    # Save a small headline summary the live web app can show inline.
+    import json as _json
+    headline = {mm.name: {"display": mm.display, "rag": mm.rag}
+                for mm in portfolio_metrics
+                if mm.name in ("Total return", "CAGR", "Sharpe ratio",
+                               "Sortino ratio", "Calmar ratio", "Max drawdown",
+                               "1-day VaR 95%", "Jensen's alpha (annualized)",
+                               "Information ratio vs SPY")}
+    (OUTPUT.parent / "summary.json").write_text(_json.dumps({
+        "generated": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "coverage": coverage, "metrics": headline}))
+
     banners = [
         "Survivorship bias: this backtest trades 20 large companies that are "
         "still successful TODAY. Companies that collapsed along the way are "

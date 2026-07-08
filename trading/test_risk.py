@@ -129,6 +129,16 @@ def main() -> int:
     else:
         print(f"   {sc['message']}")
 
+    # ---- Save a small summary the live web app can show inline ----
+    import json as _json
+    (RISK_HTML.parent / "risk_summary.json").write_text(_json.dumps({
+        "generated": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "regime": label,
+        "montecarlo": {book: (mc.get("prob_breach") if mc.get("ok") else None)
+                       for book, mc in mc_rows.items()},
+        "smallcap_verdict": sc.get("verdict") if sc.get("ok") else None,
+    }))
+
     # ---- Write the HTML report ----
     _write_html(label, info, regime_perf, kelly_rows, mc_rows, sc, results)
     print("\n" + "=" * 64)

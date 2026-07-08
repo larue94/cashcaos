@@ -47,9 +47,35 @@ def _run_job(kind: str) -> None:
             _job.update(running=False, done=True, log=buf.getvalue(), error=str(e))
 
 
+_REPORTS = Path(__file__).resolve().parent.parent / "dashboard" / "output"
+
+
 @app.route("/")
 def index():
     return send_from_directory(_STATIC, "app.html")
+
+
+def _serve_report(filename: str, human_name: str, build_cmd: str):
+    path = _REPORTS / filename
+    if path.exists():
+        return send_from_directory(_REPORTS, filename)
+    return (f"<div style='font-family:system-ui;max-width:600px;margin:60px auto;"
+            f"padding:0 20px;line-height:1.6'><h2>{human_name} not generated yet</h2>"
+            f"<p>Run this once to create it, then refresh:</p>"
+            f"<pre style='background:#f0efe9;padding:12px;border-radius:8px'>"
+            f"{build_cmd}</pre><p><a href='/'>← back to the dashboard</a></p></div>"), 200
+
+
+@app.route("/backtest")
+def backtest_report():
+    return _serve_report("dashboard.html", "Backtest & metrics dashboard",
+                         "python -m trading.test_backtest")
+
+
+@app.route("/risk")
+def risk_report():
+    return _serve_report("risk.html", "Risk & Monte Carlo report",
+                         "python -m trading.test_risk")
 
 
 @app.route("/api/state")

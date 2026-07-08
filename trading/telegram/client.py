@@ -44,6 +44,18 @@ class TelegramClient:
             params["reply_markup"] = buttons
         return self._call("sendMessage", **params)
 
+    def send_photo(self, chat_id, photo: bytes, caption: str = "") -> dict:
+        """Send an image (e.g. a chart PNG) with an optional caption."""
+        resp = requests.post(
+            _BASE.format(token=self._token, method="sendPhoto"),
+            data={"chat_id": chat_id, "caption": caption, "parse_mode": "HTML"},
+            files={"photo": ("chart.png", photo, "image/png")},
+            timeout=70)
+        data = resp.json()
+        if not data.get("ok"):
+            raise RuntimeError(f"sendPhoto failed: {data.get('description', data)}")
+        return data.get("result", {})
+
     def edit(self, chat_id, message_id, text: str,
              buttons: dict | None = None) -> dict:
         params = {"chat_id": chat_id, "message_id": message_id, "text": text,
