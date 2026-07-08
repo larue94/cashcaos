@@ -37,6 +37,11 @@ def form_opinion(ticker: str) -> Opinion:
     price = float(close.iloc[-1])
     sma50 = float(close.rolling(50).mean().iloc[-1])
     sma200 = float(close.rolling(200).mean().iloc[-1])
+    # 200-WEEK moving average (~4 years): the long-term secular trend line that
+    # institutions watch. Computed from weekly closes; needs enough history.
+    weekly = close.resample("W").last().dropna()
+    sma200w = (float(weekly.rolling(200).mean().iloc[-1])
+               if len(weekly) >= 200 else None)
     rsi = _rsi(close)
     high20 = float(df["High"].iloc[-21:-1].max())
     vol_avg = float(df["Volume"].rolling(63).mean().iloc[-1])
@@ -54,6 +59,19 @@ def form_opinion(ticker: str) -> Opinion:
         score -= 15
         notes.append("Long-term trend is down (50-day average below 200-day) — "
                      "usually better to wait.")
+
+    # Secular trend: the 200-week average is the multi-year backbone.
+    if sma200w is not None:
+        if price > sma200w:
+            score += 8
+            notes.append(f"Above its 200-WEEK average (${sma200w:,.2f}) — in a "
+                         "multi-year secular uptrend, the strongest long-term "
+                         "backdrop.")
+        else:
+            score -= 12
+            notes.append(f"Below its 200-WEEK average (${sma200w:,.2f}) — the "
+                         "multi-year trend has broken down; a serious caution "
+                         "flag for long-term buyers.")
 
     if price > sma50:
         score += 10
@@ -87,7 +105,8 @@ def form_opinion(ticker: str) -> Opinion:
         agent="technical", ticker=ticker, score=score,
         stance=stance_from_score(score), notes=notes,
         data={"price": round(price, 2), "sma50": round(sma50, 2),
-              "sma200": round(sma200, 2), "rsi": round(rsi, 1),
-              "volume_vs_norm": round(vol_ratio, 2)})
+              "sma200": round(sma200, 2),
+              "sma200w": round(sma200w, 2) if sma200w is not None else None,
+              "rsi": round(rsi, 1), "volume_vs_norm": round(vol_ratio, 2)})
     opinion.log()
     return opinion

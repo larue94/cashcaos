@@ -199,6 +199,9 @@ def deep_report(ticker: str) -> dict:
     sma20 = float(close.rolling(20).mean().iloc[-1])
     sma50 = float(close.rolling(50).mean().iloc[-1])
     sma200 = float(close.rolling(200).mean().iloc[-1])
+    weekly = close.resample("W").last().dropna()
+    sma200w = (float(weekly.rolling(200).mean().iloc[-1])
+               if len(weekly) >= 200 else None)
     rsi = float(_rsi(close).iloc[-1])
     macd, signal, hist = _macd(close)
     bb_mid = close.rolling(20).mean()
@@ -214,6 +217,7 @@ def deep_report(ticker: str) -> dict:
         "fundamentals": fundamentals_block(ticker),
         "tech": {
             "price": price, "sma20": sma20, "sma50": sma50, "sma200": sma200,
+            "sma200w": sma200w,
             "rsi": rsi, "macd": float(macd.iloc[-1]),
             "macd_signal": float(signal.iloc[-1]), "macd_hist": float(hist.iloc[-1]),
             "bb_up": bb_up, "bb_lo": bb_lo, "atr": atr,
@@ -239,6 +243,14 @@ def format_report(rep: dict) -> str:
     lines.append(f"Trend: {trend} (50-day ${t['sma50']:,.2f} vs 200-day "
                  f"${t['sma200']:,.2f}); price is "
                  f"{'above' if t['price'] > t['sma50'] else 'below'} the 50-day.")
+    if t.get("sma200w") is not None:
+        above = t["price"] > t["sma200w"]
+        lines.append(f"Secular trend: 200-WEEK average ${t['sma200w']:,.2f} — "
+                     f"price is {'ABOVE' if above else 'BELOW'} it, "
+                     + ("a multi-year bull backdrop (strongest long-term signal)."
+                        if above else
+                        "meaning the multi-year trend has broken — a major "
+                        "long-term caution."))
     lines.append(f"Momentum: RSI {t['rsi']:.0f} "
                  + ("(overbought — stretched)" if t["rsi"] >= 70
                     else "(oversold — washed out)" if t["rsi"] <= 30

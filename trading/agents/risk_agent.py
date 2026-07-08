@@ -49,10 +49,17 @@ def _high_water_mark(current_equity: float) -> float:
     return hwm
 
 
+# How much of the sized position to actually take, by conviction. A
+# medium-confidence idea is real enough to act on, but at a smaller size than
+# a high-confidence one — conviction drives size, not just a label.
+_CONFIDENCE_SCALE = {"high": 1.0, "medium": 0.66, "low": 0.4, "rule": 1.0}
+
+
 def assess(account: AccountSnapshot, ticker: str, price: float,
            book: str | None = None, current_tickers: list[str] | None = None,
            prices=None, book_trade_returns: list[float] | None = None,
-           max_position_fraction: float | None = None) -> RiskVerdict:
+           max_position_fraction: float | None = None,
+           confidence: str | None = None) -> RiskVerdict:
     """Judge and size a proposed BUY. Extra args (all optional) enable the
     Phase 6 rules; without them it behaves like the Phase 3 flat-cap version.
 
@@ -112,6 +119,16 @@ def assess(account: AccountSnapshot, ticker: str, price: float,
         verdict = RiskVerdict(False, ticker, 0.0, 0, reasons)
         _log(verdict)
         return verdict
+
+    # Scale by conviction: a medium-confidence idea gets a smaller position.
+    if confidence:
+        scale = _CONFIDENCE_SCALE.get(confidence.lower(), 1.0)
+        if scale < 1.0:
+            reasons.append(
+                f"Confidence is '{confidence}', so the position is scaled to "
+                f"{scale * 100:.0f}% of full size — we act on it, but smaller "
+                "than a high-confidence idea.")
+        fraction *= scale
 
     cap_dollars = account.equity * fraction
     shares = int(cap_dollars // price)

@@ -235,6 +235,28 @@ def run(watchlist: list[str], verbose: bool = True) -> Recommendation:
                   f"Head of team chose no trade today. Reasoning: {rec.thesis}")
         return rec
 
+    # Confidence floor: below the configured bar, don't recommend a trade —
+    # "watching, but not convinced enough today" is a valid, disciplined answer.
+    from trading.config import get_settings
+    rank = {"low": 0, "medium": 1, "high": 2}
+    floor = rank.get(get_settings().min_confidence, 1)
+    if rank.get((rec.confidence or "").lower(), 1) < floor:
+        say(f"  Best idea was {rec.ticker} but only '{rec.confidence}' "
+            f"confidence — below the '{get_settings().min_confidence}' bar. "
+            "Recommending patience.")
+        log_event("orchestrator", "recommendation",
+                  f"Best candidate {rec.ticker} was only {rec.confidence} "
+                  f"confidence, below the {get_settings().min_confidence} floor. "
+                  "No trade recommended — waiting for a stronger setup.")
+        held = rec.action
+        rec.action = "none"
+        rec.thesis = (f"The best idea today was {rec.ticker}, but only at "
+                      f"'{rec.confidence}' confidence — below your minimum bar of "
+                      f"'{get_settings().min_confidence}'. Rather than push a "
+                      "so-so setup, the disciplined call is to wait for a "
+                      "stronger one. (Original view: " + rec.thesis + ")")
+        return rec
+
     # The Risk agent has the last word — veto power over everything.
     say("  Risk agent reviewing the proposal (correlation + Kelly sizing)...")
     tech_data = next((o.data for o in all_opinions.get(rec.ticker, [])
@@ -249,7 +271,7 @@ def run(watchlist: list[str], verbose: bool = True) -> Recommendation:
     verdict = risk_agent.assess(
         account, rec.ticker, price, book=rec.strategy_book,
         current_tickers=current_tickers, prices=prices,
-        book_trade_returns=book_returns)
+        book_trade_returns=book_returns, confidence=rec.confidence)
     rec.risk_notes = verdict.reasons
     if not verdict.approved:
         rec.action = "vetoed"

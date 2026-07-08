@@ -39,6 +39,10 @@ class Settings:
     max_drawdown_smallcap: float = 0.35    # accepted budget for the sleeve
     smallcap_sleeve_fraction: float = 0.15 # 10–20% of capital; default 15%
     max_position_fraction: float = 0.05    # flat 5% cap until Kelly has data
+    # Confidence discipline: skip any recommendation below this bar, and scale
+    # the position size by conviction (high = full, medium/low = smaller).
+    # Options: "low" (surface all), "medium" (skip low), "high" (only high).
+    min_confidence: str = field(default_factory=lambda: os.getenv("MIN_CONFIDENCE", "medium"))
     # Hard per-position stop-loss: sell if a holding falls this far below its
     # entry price, regardless of the trend rules. A safety net, not a strategy.
     # 0 disables it. Small-cap sleeve gets its own wider stop (see below).
