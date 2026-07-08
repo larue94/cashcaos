@@ -42,8 +42,8 @@ There is **no day trading** anywhere in the system.
 
 - [x] Phase 1 — Skeleton + Alpaca connection test
 - [x] Phase 2 — Data pipeline (prices, fundamentals, news)
-- [x] **Phase 3 — The 4 agents + orchestrator, first example recommendation** ← *you are here*
-- [ ] Phase 4 — Backtesting with walk-forward windows + metrics dashboard
+- [x] Phase 3 — The 4 agents + orchestrator, first example recommendation
+- [x] **Phase 4 — Backtesting with walk-forward windows + metrics dashboard** ← *you are here*
 - [ ] Phase 5 — Daily digest + your approval workflow + learning loop
 - [ ] Phase 6 — Risk calibration: regimes, correlation limits, Kelly sizing,
       Monte Carlo, small-cap screener (backtested honestly, losers included)
@@ -157,9 +157,34 @@ uses a free open-source model, Llama 3.3 70B via Groq's free tier (LOW tier).
 Model choices can be changed in `.env` — including pointing the LOW tier at
 Ollama on your own computer (see `.env.example`).
 
+**Phase 4 — walk-forward backtest + dashboard:**
+
+```
+python -m trading.test_backtest
+```
+
+**What you should see:** the three core books are tested the honest way —
+settings tuned on 3 years, then run on the NEXT unseen year, rolled forward
+across all history, with 0.1% per-trade costs. The console prints each book
+vs buy-and-hold SPY, and a full dashboard is written to
+`trading/dashboard/output/dashboard.html` — double-click it to open in your
+browser. Every metric has a plain-English explanation and a red/amber/green
+flag against institutional benchmarks; honesty banners (survivorship bias,
+data coverage, overfitting) sit at the top.
+
 ---
 
 ## What could break
+
+### Phase 4 (backtest + dashboard)
+
+- **First run is slow** (~5 minutes): 21 stocks' full history is downloaded,
+  then cached — later runs take seconds.
+- **Backtest ≠ promise.** Even the honest walk-forward method can't fix
+  survivorship bias in free data, and the mechanical rules are a simplified
+  skeleton of what the live agents do. The dashboard says this on its face.
+- **Results change slightly between runs months apart** — new data arrives,
+  and the newest partial year is included and marked as partial.
 
 ### Phase 3 (agent team)
 
