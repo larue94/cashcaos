@@ -40,8 +40,8 @@ There is **no day trading** anywhere in the system.
 
 ## Build phases (where we are)
 
-- [x] **Phase 1 — Skeleton + Alpaca connection test** ← *you are here*
-- [ ] Phase 2 — Data pipeline (prices, fundamentals, news)
+- [x] Phase 1 — Skeleton + Alpaca connection test
+- [x] **Phase 2 — Data pipeline (prices, fundamentals, news)** ← *you are here*
 - [ ] Phase 3 — The 4 agents + orchestrator, first example recommendation
 - [ ] Phase 4 — Backtesting with walk-forward windows + metrics dashboard
 - [ ] Phase 5 — Daily digest + your approval workflow + learning loop
@@ -99,7 +99,20 @@ couple of minutes the first time.)
 
 ---
 
-## Test it yourself — one command
+### Step 4 (from Phase 2): Get a free Finnhub key for news
+
+1. Go to **https://finnhub.io** and click **Get free API key** (free forever
+   tier, no card needed).
+2. After signing in, your API key is shown right on the dashboard.
+3. Paste it into your `.env` file on the `FINNHUB_API_KEY=` line.
+
+Until you do this, the system simply skips news — everything else works.
+
+---
+
+## Test it yourself — one command per phase
+
+**Phase 1 — broker connection:**
 
 ```
 python -m trading.test_connection
@@ -113,9 +126,39 @@ $100,000), and confirming the market's open/closed status. Every check gets a
 If anything is wrong (missing keys, typo in the keys, no internet), the test
 tells you in plain English what to fix.
 
+**Phase 2 — data pipeline:**
+
+```
+python -m trading.test_data
+```
+
+**What you should see:** a checklist covering the three data feeds —
+prices (Apple and the S&P 500 as guinea pigs), company fundamentals
+(including Apple's officially filed revenue straight from the SEC), and
+news headlines. News shows a ⚠️ skip note until you add the free Finnhub
+key (Step 4 above) — that's expected, not a failure.
+
 ---
 
-## What could break (Phase 1)
+## What could break
+
+### Phase 2 (data pipeline)
+
+- **Yahoo Finance rate-limiting** — Yahoo sometimes temporarily blocks
+  networks that ask too often (very common on shared cloud machines, rare at
+  home). The system automatically falls back to Alpaca's own price data, so
+  prices keep working; the "fundamentals snapshot" (market value, margins)
+  shows a ⚠️ until Yahoo cools off. The official SEC numbers are unaffected.
+- **SEC EDGAR slowness** — it's a government website; occasionally slow.
+  Retry a few minutes later.
+- **A wrong ticker symbol** — asking for "Apple" instead of "AAPL" gives a
+  clear error saying to check the spelling.
+- **Survivorship bias (important, permanent)** — free data sources mostly
+  carry companies that still exist. Companies that went bankrupt are missing
+  from history, which flatters backtest results. The backtester (Phase 4)
+  will flag this on every report.
+
+### Phase 1 (broker connection)
 
 - **Wrong or swapped keys** — the most common issue. If the test says
   "unauthorized", re-check that the Key ID went in `ALPACA_API_KEY` and the

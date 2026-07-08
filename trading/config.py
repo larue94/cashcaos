@@ -40,8 +40,17 @@ class Settings:
     smallcap_sleeve_fraction: float = 0.15 # 10–20% of capital; default 15%
     max_position_fraction: float = 0.05    # flat 5% cap until Kelly has data
 
+    # --- Data pipeline ---
+    # SEC EDGAR asks automated tools to identify themselves with a contact.
+    edgar_contact: str = field(
+        default_factory=lambda: os.getenv("EDGAR_CONTACT", "cashcaos-trading research@example.com")
+    )
+    # Backtests run 2010-2026, so price history is fetched from here onward.
+    price_history_start: str = "2010-01-01"
+
     # --- Files ---
     logs_dir: Path = PACKAGE_DIR / "logs"
+    cache_dir: Path = PACKAGE_DIR / "data" / "cache"
 
     def missing_alpaca_keys(self) -> list[str]:
         """Names of the Alpaca settings that are still blank."""
