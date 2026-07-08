@@ -80,3 +80,10 @@ class Broker(ABC):
         NOTE: nothing in this system calls submit_order without an explicit
         human approval recorded first (enforced from Phase 5 onward).
         """
+
+    @abstractmethod
+    def get_order_status(self, order_id: str) -> dict:
+        """Look up an order: {'status', 'filled_qty', 'filled_avg_price'}.
+
+        status is normalized to: 'filled', 'open', 'cancelled', or 'unknown'.
+        """

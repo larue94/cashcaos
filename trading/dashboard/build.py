@@ -270,6 +270,22 @@ def build(path, title: str, banners: list[str], sections: list[dict],
              f"<p class='sub'>{html.escape(generated_note)}</p>"]
     for b in banners:
         parts.append(f"<div class='banner'>⚠️ {b}</div>")
+    parts.append(
+        "<div class='card'><b>How to read this page — what the best funds "
+        "aim for.</b><p class='sub' style='margin:6px 0 0'>"
+        "Maximizing return alone is easy: just take huge risks. The craft "
+        "that top funds are judged on is <b>return per unit of risk</b>. "
+        "Concretely, an elite track record shows all five at once: "
+        "<b>(1) Grow more than the market</b> — the blue line above the gray "
+        "SPY line; <b>(2) efficiently</b> — Sharpe above 1 (elite above 2), "
+        "Sortino above 2, Calmar above 1; <b>(3) with bounded pain</b> — max "
+        "drawdown under 20%, 1-day VaR&nbsp;95% under ~2%, volatility around "
+        "10–15%; <b>(4) provably by skill, not luck</b> — Jensen's alpha "
+        "positive with p-value under 0.05; <b>(5) not just by riding the "
+        "market</b> — beta well under 1 and information ratio above 0.5. "
+        "A strategy that maximizes (1) while failing (3) is a rocket with no "
+        "seatbelts — the flags below grade every metric against these "
+        "targets.</p></div>")
     for s in sections:
         parts.append(f"<h2>{html.escape(s['name'])}</h2>"
                      f"<p class='sub'>{html.escape(s['subtitle'])}</p>")

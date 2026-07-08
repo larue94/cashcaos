@@ -178,31 +178,48 @@ def compute_metrics(returns: pd.Series, spy: pd.Series,
                     "How long the fall took, and how long until the account "
                     "made it back.", float(dd_days)))
     vol = float(returns.std() * np.sqrt(TRADING_DAYS))
-    m.append(Metric("Annualized volatility", _fmt_pct(vol), "SPY is ~15-20%",
-                    "info", "Typical size of the yearly swings — the "
-                    "bumpiness of the ride.", vol))
+    m.append(Metric("Annualized volatility", _fmt_pct(vol),
+                    "top funds ~10-15%; SPY ~15-20%",
+                    "green" if vol <= 0.15 else "amber" if vol <= 0.25 else "red",
+                    "Typical size of the yearly swings. The best funds earn "
+                    "their returns with a SMOOTH ride — high return on low "
+                    "volatility is the whole game.", vol))
     var95 = float(-np.percentile(returns.dropna(), 5))
     var99 = float(-np.percentile(returns.dropna(), 1))
-    m.append(Metric("1-day VaR 95%", _fmt_pct(var95), "context, not pass/fail",
-                    "info", "On 19 days out of 20, a single day's loss stayed "
-                    "smaller than this.", var95))
-    m.append(Metric("1-day VaR 99%", _fmt_pct(var99), "context, not pass/fail",
-                    "info", "On 99 days out of 100, a single day's loss stayed "
-                    "smaller than this.", var99))
+    m.append(Metric("1-day VaR 95%", _fmt_pct(var95),
+                    "top funds keep this under ~2%",
+                    "green" if var95 < 0.02 else "amber" if var95 < 0.03 else "red",
+                    "On 19 days out of 20, a single day's loss stayed smaller "
+                    "than this. Great funds maximize return while keeping this "
+                    "SMALL — big returns with small daily risk.", var95))
+    m.append(Metric("1-day VaR 99%", _fmt_pct(var99),
+                    "under ~3.5% at the best funds",
+                    "green" if var99 < 0.035 else "amber" if var99 < 0.05 else "red",
+                    "On 99 days out of 100, a single day's loss stayed smaller "
+                    "than this — the 'bad month's worst day' gauge.", var99))
     tail = returns[returns <= -var95]
     cvar = float(-tail.mean()) if len(tail) else 0.0
     m.append(Metric("CVaR (expected shortfall)", _fmt_pct(cvar),
-                    "context, not pass/fail", "info",
+                    "under ~3% is strong",
+                    "green" if cvar < 0.03 else "amber" if cvar < 0.045 else "red",
                     "When one of those worst-5% days DID happen, this was the "
-                    "average size of the hit.", cvar))
+                    "average size of the hit — the depth of the tail, which "
+                    "disciplined funds keep shallow.", cvar))
     alpha, beta, pval = _alpha_beta_pvalue(returns, spy)
-    m.append(Metric("Beta to SPY", f"{beta:.2f}", "1 = moves with the market",
-                    "info", "How much the strategy moves when the market moves "
-                    "1% — below 1 means calmer than the market.", beta))
-    downside = returns[returns < 0].std() * np.sqrt(TRADING_DAYS)
-    m.append(Metric("Downside deviation", _fmt_pct(float(downside or 0)),
-                    "lower is better", "info",
-                    "Volatility counting only the bad days.", float(downside or 0)))
+    m.append(Metric("Beta to SPY", f"{beta:.2f}",
+                    "elite funds ~0.3-0.85 (1 = just the market)",
+                    "green" if beta <= 0.85 else "amber" if beta <= 1.1 else "red",
+                    "How much the strategy moves when the market moves 1%. "
+                    "The best funds keep this LOW while returns stay high — "
+                    "proof the returns aren't just market exposure in "
+                    "disguise.", beta))
+    downside = float(returns[returns < 0].std() * np.sqrt(TRADING_DAYS) or 0)
+    m.append(Metric("Downside deviation", _fmt_pct(downside),
+                    "top funds under ~10-12%",
+                    "green" if downside <= 0.12 else "amber" if downside <= 0.18
+                    else "red",
+                    "Volatility counting only the bad days — the number "
+                    "Sortino divides by.", downside))
 
     # ---------- Alpha ----------
     alpha_rag = ("green" if alpha > 0 and pval < 0.05
@@ -267,14 +284,20 @@ def compute_metrics(returns: pd.Series, spy: pd.Series,
                         "sat safely in cash).", gross))
         turnover = float(weights.diff().abs().sum(axis=1).mean() / 2 * TRADING_DAYS)
         m.append(Metric("Turnover (annualized)", f"{turnover:.1f}x",
-                        "lower = fewer costs", "info",
+                        "under ~4x/yr keeps costs small for these styles",
+                        "green" if turnover <= 4 else "amber" if turnover <= 8
+                        else "red",
                         "How many times per year the whole portfolio is "
                         "replaced — each turn costs 0.1% per side.", turnover))
         top5 = float(weights.apply(lambda row: row.nlargest(5).sum(), axis=1).mean())
         m.append(Metric("Top-5 position weight", _fmt_pct(top5),
-                        "context, not pass/fail", "info",
-                        "Average share of capital in the 5 largest holdings — "
-                        "concentration cuts both ways.", top5))
+                        "diversified funds keep this under ~40-50%",
+                        "green" if top5 <= 0.5 else "amber" if top5 <= 0.8
+                        else "red",
+                        "Average share of capital in the 5 largest holdings. "
+                        "Books that hold only 3-4 names are naturally near "
+                        "100% — the Phase 6 correlation limits are the "
+                        "counterweight.", top5))
         if sectors:
             sector_weights: dict[str, float] = {}
             for t in weights.columns:

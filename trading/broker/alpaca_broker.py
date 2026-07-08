@@ -84,3 +84,21 @@ class AlpacaBroker(Broker):
             )
         order = self._client.submit_order(request)
         return str(order.id)
+
+    def get_order_status(self, order_id: str) -> dict:
+        order = self._client.get_order_by_id(order_id)
+        raw = str(order.status.value if hasattr(order.status, "value") else order.status)
+        if raw == "filled":
+            status = "filled"
+        elif raw in ("canceled", "cancelled", "expired", "rejected", "stopped"):
+            status = "cancelled"
+        elif raw in ("new", "accepted", "pending_new", "partially_filled",
+                     "accepted_for_bidding", "held"):
+            status = "open"
+        else:
+            status = "unknown"
+        return {
+            "status": status,
+            "filled_qty": float(order.filled_qty or 0),
+            "filled_avg_price": float(order.filled_avg_price or 0),
+        }

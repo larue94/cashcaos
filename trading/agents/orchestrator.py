@@ -21,6 +21,7 @@ from trading.agents.opinion import Opinion
 from trading.audit_log import log_event
 from trading.broker import get_broker
 from trading.data.fundamentals import EdgarClient
+from trading.learning import ledger, store
 from trading.llm import ask
 
 # Candidates must score at least this on fundamentals to be considered at all.
@@ -64,6 +65,10 @@ class Recommendation:
     risk_notes: list[str] = field(default_factory=list)
     opinions: dict = field(default_factory=dict)   # ticker -> [Opinion, ...]
 
+    def scores_for(self, ticker: str) -> dict:
+        """The three agents' scores for one ticker (for the learning ledger)."""
+        return {op.agent: op.score for op in self.opinions.get(ticker, [])}
+
 
 def _opinions_text(ticker: str, opinions: list[Opinion]) -> str:
     lines = [f"=== {ticker} ==="]
@@ -92,6 +97,14 @@ def run(watchlist: list[str], verbose: bool = True) -> Recommendation:
 
     log_event("orchestrator", "run-start",
               f"Analyzing watchlist: {', '.join(watchlist)}")
+
+    # Adaptive weighting: agents that have been WRONG lately count for less
+    # (see trading/learning/ledger.py). Neutral 1.0 until history builds.
+    with store.connect() as conn:
+        w = ledger.weights(conn)
+    log_event("orchestrator", "agent-weights", ledger.weights_note(w),
+              data=dict(w))
+
     edgar = EdgarClient()
     all_opinions: dict[str, list[Opinion]] = {}
     candidates: list[tuple[float, str]] = []
@@ -113,10 +126,14 @@ def run(watchlist: list[str], verbose: bool = True) -> Recommendation:
                       f"is below the gate of {FUNDAMENTALS_GATE}. "
                       "(Rule: fundamentals decide WHAT to buy.)")
             continue
-        # Rank: fundamentals decide WHAT (60%), timing WHEN (30%), mood (10%).
+        # Rank: fundamentals decide WHAT (60%), timing WHEN (30%), mood (10%),
+        # each scaled by that agent's adaptive confidence weight.
         sentiment_score = sentiment.score if sentiment.stance != "unavailable" else 50
-        combined = 0.6 * research.score + 0.3 * technical.score + 0.1 * sentiment_score
-        candidates.append((combined, ticker))
+        num = (0.6 * w["research"] * research.score
+               + 0.3 * w["technical"] * technical.score
+               + 0.1 * w["sentiment"] * sentiment_score)
+        den = 0.6 * w["research"] + 0.3 * w["technical"] + 0.1 * w["sentiment"]
+        candidates.append((num / den, ticker))
 
     if not candidates:
         log_event("orchestrator", "recommendation",

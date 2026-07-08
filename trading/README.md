@@ -43,8 +43,8 @@ There is **no day trading** anywhere in the system.
 - [x] Phase 1 — Skeleton + Alpaca connection test
 - [x] Phase 2 — Data pipeline (prices, fundamentals, news)
 - [x] Phase 3 — The 4 agents + orchestrator, first example recommendation
-- [x] **Phase 4 — Backtesting with walk-forward windows + metrics dashboard** ← *you are here*
-- [ ] Phase 5 — Daily digest + your approval workflow + learning loop
+- [x] Phase 4 — Backtesting with walk-forward windows + metrics dashboard
+- [x] **Phase 5 — Daily digest + your approval workflow + learning loop** ← *you are here*
 - [ ] Phase 6 — Risk calibration: regimes, correlation limits, Kelly sizing,
       Monte Carlo, small-cap screener (backtested honestly, losers included)
 
@@ -174,7 +174,41 @@ data coverage, overfitting) sit at the top.
 
 ---
 
+## Your daily routine (from Phase 5 onward)
+
+```
+python -m trading.digest     # each market morning (~3 minutes)
+python -m trading.approve    # decide y/n on each recommendation
+python -m trading.review     # once a week, e.g. Saturday
+```
+
+- **digest** syncs yesterday's fills, grades any completed trades into the
+  learning ledger, checks exit rules on open positions, asks the agent team
+  for today's best new idea, and refreshes the live dashboard
+  (`trading/dashboard/output/live.html`).
+- **approve** is the ONLY command that can ever send an order — it asks you
+  y/n per trade, on a real keyboard, and logs your decision. Rejections are
+  recorded; pending items expire after 3 days.
+- **review** writes the weekly plain-English self-review from real numbers,
+  proposes rule adjustments (words only — nothing changes without you), and
+  calls out any metric red two weeks running.
+- The learning loop grades every agent on every CLOSED trade and adapts
+  their influence automatically (0.3x–1.2x). All of it persists in a local
+  database (`trading/data/cache/journal.db`) so learning survives restarts.
+
+---
+
 ## What could break
+
+### Phase 5 (digest / approval / learning)
+
+- **Orders execute at the next market open** if you approve while the
+  market is closed — the digest confirms the fill the next morning.
+- **The learning ledger starts empty.** Agent report cards show "—" until
+  ~5 trades have fully closed; weights stay neutral (1.0x) until then.
+- **If an order is rejected by the broker** (rare on paper), the
+  recommendation stays pending and `approve` explains what happened —
+  just run it again after fixing the issue.
 
 ### Phase 4 (backtest + dashboard)
 
