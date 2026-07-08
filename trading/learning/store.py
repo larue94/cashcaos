@@ -89,6 +89,11 @@ def _migrate(conn: sqlite3.Connection) -> None:
         # rationale, so the web UI can show WHY without re-running the team.
         conn.execute("ALTER TABLE recommendations ADD COLUMN agent_details TEXT")
         conn.commit()
+    if "telegram_message_id" not in cols:
+        # Set once a recommendation has been pushed to Telegram, so the bot
+        # doesn't send the same card twice (survives restarts).
+        conn.execute("ALTER TABLE recommendations ADD COLUMN telegram_message_id TEXT")
+        conn.commit()
 
 
 # ---------- recommendations ----------

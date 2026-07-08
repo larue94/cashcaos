@@ -39,6 +39,21 @@ class Settings:
     max_drawdown_smallcap: float = 0.35    # accepted budget for the sleeve
     smallcap_sleeve_fraction: float = 0.15 # 10–20% of capital; default 15%
     max_position_fraction: float = 0.05    # flat 5% cap until Kelly has data
+    # Hard per-position stop-loss: sell if a holding falls this far below its
+    # entry price, regardless of the trend rules. A safety net, not a strategy.
+    # 0 disables it. Small-cap sleeve gets its own wider stop (see below).
+    stop_loss_pct: float = field(
+        default_factory=lambda: float(os.getenv("STOP_LOSS_PCT", "0.15")))
+    stop_loss_pct_smallcap: float = field(
+        default_factory=lambda: float(os.getenv("STOP_LOSS_PCT_SMALLCAP", "0.30")))
+
+    # --- Telegram bot (phone alerts + Approve/Reject buttons) ---
+    telegram_bot_token: str = field(default_factory=lambda: os.getenv("TELEGRAM_BOT_TOKEN", ""))
+    # If set, only this chat may approve/reject. If blank, the first person to
+    # send /start becomes the owner (saved locally so it survives restarts).
+    telegram_chat_id: str = field(default_factory=lambda: os.getenv("TELEGRAM_CHAT_ID", ""))
+    # Local time (24h HH:MM) to auto-run the daily digest on weekdays.
+    telegram_digest_time: str = field(default_factory=lambda: os.getenv("TELEGRAM_DIGEST_TIME", "09:45"))
 
     # --- AI reasoning layer (two tiers; see trading/llm.py) ---
     # HIGH tier: judgment calls — final trade reasoning, the daily digest,

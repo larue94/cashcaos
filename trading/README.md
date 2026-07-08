@@ -197,6 +197,38 @@ every button uses the exact same rules and broker path as the commands
 below — the app is just a friendlier face on the identical engine. Approving
 still asks you to confirm before any order is sent.
 
+## Get alerts on your phone (Telegram bot)
+
+The bot messages you each recommendation with **Approve / Reject** buttons and
+runs the analysis automatically every weekday — so exits (including the new
+safety stop-loss) get checked daily without you remembering to.
+
+**One-time setup (about 3 minutes):**
+
+1. In Telegram, search for **@BotFather** (the official blue-tick account) and
+   open a chat with it.
+2. Send **`/newbot`**. It asks for a name (anything, e.g. "My Trading Bot")
+   and a username ending in `bot` (e.g. `my_caos_trading_bot`).
+3. BotFather replies with a **token** — a long string like
+   `8123456:AAE...`. Copy it.
+4. Paste it into `trading/.env` on the `TELEGRAM_BOT_TOKEN=` line.
+5. Start the bot:
+   ```
+   python -m trading.telegram
+   ```
+6. On your phone, open your new bot and send it **`/start`**. You become its
+   owner (only you can approve trades). Done.
+
+**Using it:** each morning (default 9:45, set `TELEGRAM_DIGEST_TIME`) the bot
+runs the analysis and sends any recommendations with buttons. Approving asks
+for a second confirming tap before the order is sent. Commands: `/pending`,
+`/status`, `/digest` (run now), `/help`.
+
+**To have it run 24/7** (check daily even when your computer is off), deploy it
+to an always-on host — the start command is `python -m trading.telegram`. Set
+the host's timezone (`TZ`) so the daily time matches your local morning, and
+put your keys in the host's environment variables.
+
 ## The command-line way (same engine, no browser)
 
 ```
@@ -206,9 +238,13 @@ python -m trading.review     # once a week, e.g. Saturday
 ```
 
 - **digest** syncs yesterday's fills, grades any completed trades into the
-  learning ledger, checks exit rules on open positions, asks the agent team
-  for today's best new idea, and refreshes the live dashboard
-  (`trading/dashboard/output/live.html`).
+  learning ledger, checks exit rules on open positions (each book's trend
+  exit **plus a hard stop-loss safety net** — sell if a holding drops >15%
+  below entry, 30% for the small-cap sleeve; set `STOP_LOSS_PCT` in `.env`),
+  asks the agent team for today's best new idea, and refreshes the live
+  dashboard (`trading/dashboard/output/live.html`). Exits become SELL
+  recommendations that also wait for your approval. The stop-loss is a live
+  safety overlay not present in the historical backtest.
 - **approve** is the ONLY command that can ever send an order — it asks you
   y/n per trade, on a real keyboard, and logs your decision. Rejections are
   recorded; pending items expire after 3 days.

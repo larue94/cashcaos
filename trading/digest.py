@@ -60,12 +60,28 @@ def sync_fills(conn, broker, say) -> None:
 
 
 # Exit rules per book — the mechanical guardrails behind each exit plan.
-def _exit_check(book: str, ticker: str) -> tuple[bool, str]:
+def _exit_check(book: str, ticker: str, entry_price: float | None) -> tuple[bool, str]:
+    from trading.config import get_settings
+    settings = get_settings()
     op = technical_agent.form_opinion(ticker)
     price = op.data.get("price", 0)
     sma50 = op.data.get("sma50", 0)
     sma200 = op.data.get("sma200", 0)
     rsi = op.data.get("rsi", 50)
+
+    # SAFETY FIRST: hard stop-loss, checked before any trend rule. This is a
+    # protective net that the backtest did not include — it can sell earlier
+    # than the trend rules would, on purpose, to cap a single loss.
+    stop = (settings.stop_loss_pct_smallcap if book == "smallcap"
+            else settings.stop_loss_pct)
+    if stop > 0 and entry_price and price:
+        drop = price / entry_price - 1
+        if drop <= -stop:
+            return True, (f"STOP-LOSS: {ticker} is {drop * 100:.1f}% below your "
+                          f"entry (${entry_price:,.2f} → ${price:,.2f}), past the "
+                          f"{stop * 100:.0f}% safety stop. Selling to cap the loss "
+                          "regardless of the trend.")
+
     if book == "swing":
         if rsi >= 65:
             return True, (f"Swing exit: the bounce has played out (RSI {rsi:.0f} "
@@ -85,7 +101,8 @@ def check_exits(conn, say) -> int:
     """Turn triggered exit rules into SELL recommendations needing approval."""
     created = 0
     for pos in store.open_positions(conn):
-        should_exit, why = _exit_check(pos["book"], pos["ticker"])
+        entry = pos["fill_price"] or pos["ref_price"]
+        should_exit, why = _exit_check(pos["book"], pos["ticker"], entry)
         if should_exit:
             store.save_recommendation(
                 conn, ticker=pos["ticker"], action="sell", book=pos["book"],
