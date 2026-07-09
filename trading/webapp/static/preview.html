@@ -282,6 +282,9 @@ function renderMetrics(){
     mc=`<div class="mcline">Monte Carlo — chance of breaching the 20% drawdown limit: ${parts.join(" · ")}. Market regime: <b>${(rs.regime||"?").toUpperCase()}</b>.</div>`;}
   box.innerHTML=`<div class="eyebrow">Portfolio metrics · backtested, out-of-sample</div>
     <div class="card"><div class="tiles">${tiles}</div>${mc}
-    <div class="mcline">Full institutional metrics, monthly grid, regimes, Kelly sizing, Monte Carlo &amp; the small-cap sleeve live on the Backtest and Risk pages in the live app.</div></div>`;
+    <div class="mcline">Open the full reports:
+  <a href="https://claude.ai/code/artifact/7f49f5af-0c75-406e-b1e9-2dd97801fca8" target="_blank" style="color:var(--series);font-weight:600">📊 Backtest &amp; metrics dashboard</a> ·
+  <a href="https://claude.ai/code/artifact/690fa0d7-5d25-4e5b-b433-2d2eb44c6e6d" target="_blank" style="color:var(--series);font-weight:600">🛡️ Risk &amp; Monte Carlo report</a>
+  — the complete analysis output (every metric, regimes, Kelly, Monte Carlo distributions, small-cap screener with all losers).</div></div>`;
 }
 </script>

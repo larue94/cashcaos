@@ -224,10 +224,41 @@ runs the analysis and sends any recommendations with buttons. Approving asks
 for a second confirming tap before the order is sent. Commands: `/pending`,
 `/status`, `/digest` (run now), `/help`.
 
-**To have it run 24/7** (check daily even when your computer is off), deploy it
-to an always-on host — the start command is `python -m trading.telegram`. Set
-the host's timezone (`TZ`) so the daily time matches your local morning, and
-put your keys in the host's environment variables.
+**To have it run 24/7** (check daily even when your computer is off), deploy
+the bot to Railway — see the next section.
+
+## Deploy the bot to Railway (always-on, ~10 minutes)
+
+The repo is already prepared: `railway.bot.json` holds the bot's start
+command, and the root `requirements.txt` includes everything.
+
+1. Go to **railway.app** → log in with GitHub.
+2. **New Project → Deploy from GitHub repo** → pick this repository.
+3. In the new service: **Settings → Source** → set **Branch** to the branch
+   this code lives on, and set **Config-as-code file** to `railway.bot.json`
+   (this makes the service run the bot instead of the media app).
+4. **Settings → Variables** → add these (copy values from your local
+   `trading/.env`):
+   - `ALPACA_API_KEY`, `ALPACA_SECRET_KEY`
+   - `FINNHUB_API_KEY`, `ANTHROPIC_API_KEY`, `LLM_LOW_API_KEY`
+   - `TELEGRAM_BOT_TOKEN`
+   - `TELEGRAM_CHAT_ID` — your chat id (locks the bot to you even after
+     redeploys)
+   - `TZ` — your timezone, e.g. `Europe/Rome`
+   - `TELEGRAM_DIGEST_TIME` — when the daily analysis runs, in that
+     timezone. `15:45` in Rome = 15 minutes after the US market opens
+     (good: fills have happened, prices are fresh).
+5. **Recommended — persistent storage:** right-click the service →
+   **Attach Volume** → mount path `/app/trading/data/cache`. This keeps the
+   learning database (journal.db) and caches across redeploys. Without it,
+   trade history/learning resets on every deploy (recommendations and orders
+   still live at Alpaca, so nothing dangerous is lost — just the ledger).
+6. Deploy. The bot messages you "restarted and watching" when it's up.
+
+⚠️ **Do NOT deploy the web app (`trading.webapp`) publicly** — it has no
+login, so anyone with the URL could approve trades. It's designed for your
+own computer only. The Telegram bot is safe to host: it's locked to your
+chat id.
 
 ## The command-line way (same engine, no browser)
 

@@ -1,8 +1,18 @@
-flask==3.0.0
-flask-cors==4.0.0
-requests==2.31.0
-beautifulsoup4==4.12.2
-anthropic==0.34.0
-python-dotenv==1.0.0
-gunicorn==21.2.0
-lxml==5.1.0
+# --- Media app (app.py) ---
+flask>=3.0.0
+flask-cors>=4.0.0
+requests>=2.31.0
+beautifulsoup4>=4.12.2
+python-dotenv>=1.0.0
+gunicorn>=21.2.0
+lxml>=5.1.0
+
+# --- Shared: Claude API ---
+anthropic>=0.40.0
+
+# --- Trading system (trading/) ---
+alpaca-py>=0.33.0
+yfinance>=0.2.50
+pandas>=2.0.0
+numpy>=1.26.0
+matplotlib>=3.8.0

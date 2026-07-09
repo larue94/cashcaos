@@ -19,3 +19,6 @@ anthropic>=0.40.0
 
 # The clickable local web app (python -m trading.webapp)
 flask>=3.0.0
+
+# Chart images for Telegram / reports
+matplotlib>=3.8.0
