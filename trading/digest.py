@@ -24,8 +24,61 @@ from trading.audit_log import log_event
 from trading.broker import get_broker
 from trading.learning import ledger, store
 
-# Same demo watchlist as Phase 3; edit freely.
-WATCHLIST = ["AAPL", "MSFT", "NVDA", "GOOGL", "JNJ", "XOM"]
+# Fallback watchlist if market-wide discovery is unreachable.
+FALLBACK_WATCHLIST = ["AAPL", "MSFT", "NVDA", "GOOGL", "JNJ", "XOM"]
+
+
+def build_watchlist(say) -> list[str]:
+    """Today's core-book watchlist, discovered from the whole market:
+    the S&P 500 quality-trend screen (pure math) + any S&P names with a
+    concrete news catalyst (spotted by the free open-source model)."""
+    watchlist: list[str] = []
+    try:
+        from trading.discovery.screens import core_screen
+        top = core_screen(top_n=6)
+        watchlist = [r["symbol"] for r in top]
+        say(f"  Market screen (S&P 500): leaders by quality-trend -> "
+            f"{', '.join(watchlist)}")
+        log_event("discovery", "core-screen",
+                  "S&P 500 screen leaders: " + ", ".join(
+                      f"{r['symbol']} (score {r['score']})" for r in top))
+    except Exception as e:  # noqa: BLE001
+        say(f"  Market screen unavailable ({e}) — using fallback list.")
+        return list(FALLBACK_WATCHLIST)
+    try:
+        from trading.discovery.market_data import sp500
+        from trading.discovery.news_scan import catalyst_candidates
+        sp = set(sp500()["symbol"])
+        for c in catalyst_candidates():
+            if c["symbol"] in sp and c["symbol"] not in watchlist:
+                watchlist.append(c["symbol"])
+                say(f"  + news catalyst: {c['symbol']} ({c['catalyst']})")
+    except Exception:  # noqa: BLE001
+        pass
+    return watchlist[:8]
+
+
+def sleeve_candidates(say) -> list[dict]:
+    """High-risk sleeve candidates: the runner-pattern scan over the whole
+    market's movers, plus social-buzz spikes (the '$OSCR effect')."""
+    out: list[dict] = []
+    try:
+        from trading.discovery.screens import smallcap_screen
+        for h in smallcap_screen():
+            h["source"] = "runner-pattern scan"
+            out.append(h)
+    except Exception as e:  # noqa: BLE001
+        say(f"  (runner scan unavailable: {e})")
+    try:
+        from trading.discovery.social import buzzing_stocks
+        seen = {c["symbol"] for c in out}
+        for b in buzzing_stocks():
+            if b["symbol"] not in seen:
+                b["source"] = "social buzz (Reddit)"
+                out.append(b)
+    except Exception as e:  # noqa: BLE001
+        say(f"  (buzz scan unavailable: {e})")
+    return out
 
 
 def sync_fills(conn, broker, say) -> None:
@@ -60,7 +113,8 @@ def sync_fills(conn, broker, say) -> None:
 
 
 # Exit rules per book — the mechanical guardrails behind each exit plan.
-def _exit_check(book: str, ticker: str, entry_price: float | None) -> tuple[bool, str]:
+def _exit_check(book: str, ticker: str, entry_price: float | None,
+                held_days: float | None = None) -> tuple[bool, str]:
     from trading.config import get_settings
     settings = get_settings()
     op = technical_agent.form_opinion(ticker)
@@ -91,6 +145,14 @@ def _exit_check(book: str, ticker: str, entry_price: float | None) -> tuple[bool
     elif book == "monthly":
         if price < sma50:
             return True, "Monthly exit: momentum faded (price fell below its 50-day average)."
+    elif book == "smallcap":
+        # The backtested pattern is a ~20-trading-day hold (≈28 calendar days):
+        # take what the run gave and move on — runners that keep running will
+        # show up in the scanner again.
+        if held_days is not None and held_days >= 28:
+            return True, (f"Sleeve time exit: held ~{held_days:.0f} calendar days "
+                          "(the pattern's validated window is ~20 trading days). "
+                          "Time to take the result and recycle the risk budget.")
     else:  # long-term
         if sma50 < sma200:
             return True, "Long-term exit: the durable uptrend ended (50-day average fell below the 200-day)."
@@ -100,9 +162,16 @@ def _exit_check(book: str, ticker: str, entry_price: float | None) -> tuple[bool
 def check_exits(conn, say) -> int:
     """Turn triggered exit rules into SELL recommendations needing approval."""
     created = 0
+    from datetime import datetime, timezone
     for pos in store.open_positions(conn):
         entry = pos["fill_price"] or pos["ref_price"]
-        should_exit, why = _exit_check(pos["book"], pos["ticker"], entry)
+        held_days = None
+        if pos["filled_at"]:
+            held_days = (datetime.now(timezone.utc)
+                         - datetime.fromisoformat(pos["filled_at"])
+                         ).total_seconds() / 86400
+        should_exit, why = _exit_check(pos["book"], pos["ticker"], entry,
+                                       held_days)
         if should_exit:
             store.save_recommendation(
                 conn, ticker=pos["ticker"], action="sell", book=pos["book"],
@@ -159,31 +228,35 @@ def main() -> int:
         if expired:
             say(f"  {expired} stale recommendation(s) expired (evidence >3 days old).")
 
-        say("Step 1/4: syncing order fills from the broker...")
+        say("Step 1/5: syncing order fills from the broker...")
         sync_fills(conn, broker, say)
 
-        say("Step 2/4: checking exit rules on open positions...")
+        say("Step 2/5: checking exit rules on open positions...")
         n_open = len(store.open_positions_including_pending_sells(conn))
         if n_open == 0:
             say("  No open positions yet.")
         else:
             check_exits(conn, say)
 
-        # Only look for a new buy if there isn't already a pending buy.
-        has_pending_buy = any(r["action"] == "buy" for r in store.pending(conn))
-        if has_pending_buy:
-            say("Step 3/4: a buy recommendation is already awaiting your "
-                "decision — not piling on another.")
+        # Core books: only look for a new buy if none is already pending.
+        has_pending_core = any(r["action"] == "buy" and r["book"] != "smallcap"
+                               for r in store.pending(conn))
+        if has_pending_core:
+            say("Step 3/5: a core-book buy is already awaiting your decision — "
+                "not piling on another.")
         else:
-            say("Step 3/4: running the agent team for today's best new idea...")
+            say("Step 3/5: discovering today's candidates across the market...")
+            watchlist = build_watchlist(say)
+            say("  Running the agent team on the discovered watchlist...")
             from trading.agents.orchestrator import run
-            rec = run(WATCHLIST, verbose=True)
+            rec = run(watchlist, verbose=True)
             if rec.action == "buy":
                 store.save_recommendation(
                     conn, ticker=rec.ticker, action="buy",
                     book=rec.strategy_book, shares=rec.shares,
                     dollars=rec.dollars, ref_price=rec.price,
-                    confidence=rec.confidence, thesis=rec.thesis,
+                    confidence=rec.confidence,
+                    thesis="[found by market screen] " + rec.thesis,
                     risks=rec.what_could_go_wrong, exit_plan=rec.exit_plan,
                     scores=rec.scores_for(rec.ticker),
                     agent_details=rec.details_for(rec.ticker))
@@ -193,7 +266,16 @@ def main() -> int:
                 say("  The team found nothing worth buying today — that's a "
                     "valid answer.")
 
-        say("Step 4/4: snapshotting account value + rebuilding live dashboard...")
+        # High-risk sleeve: runner pattern + social buzz, judged separately.
+        say("Step 4/5: scanning for high-risk small-cap runners + social buzz...")
+        from trading.agents import sleeve
+        cands = sleeve_candidates(say)
+        if cands:
+            sleeve.consider(cands, conn, say)
+        else:
+            say("  No runner-pattern or buzz-spike candidates today.")
+
+        say("Step 5/5: snapshotting account value + rebuilding live dashboard...")
         store.snapshot_equity(conn, account.equity, account.cash)
         from trading.dashboard.live import build_live
         path = build_live(conn, broker, account)
