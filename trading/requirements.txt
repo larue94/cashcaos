@@ -22,3 +22,6 @@ flask>=3.0.0
 
 # Chart images for Telegram / reports
 matplotlib>=3.8.0
+
+# HTML table parsing (insider-buying feed)
+lxml>=5.0.0

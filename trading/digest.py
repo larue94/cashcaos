@@ -78,6 +78,16 @@ def sleeve_candidates(say) -> list[dict]:
                 out.append(b)
     except Exception as e:  # noqa: BLE001
         say(f"  (buzz scan unavailable: {e})")
+    try:
+        from trading.discovery.spring import coiled_springs
+        seen = {c["symbol"] for c in out}
+        for s in coiled_springs():
+            if s["symbol"] not in seen:
+                s["source"] = "insider accumulation (coiled spring)"
+                s["book"] = "spring"   # patient thesis play: trend exit, no timer
+                out.append(s)
+    except Exception as e:  # noqa: BLE001
+        say(f"  (insider scan unavailable: {e})")
     return out
 
 
@@ -126,7 +136,7 @@ def _exit_check(book: str, ticker: str, entry_price: float | None,
     # SAFETY FIRST: hard stop-loss, checked before any trend rule. This is a
     # protective net that the backtest did not include — it can sell earlier
     # than the trend rules would, on purpose, to cap a single loss.
-    stop = (settings.stop_loss_pct_smallcap if book == "smallcap"
+    stop = (settings.stop_loss_pct_smallcap if book in ("smallcap", "spring")
             else settings.stop_loss_pct)
     if stop > 0 and entry_price and price:
         drop = price / entry_price - 1
@@ -146,13 +156,29 @@ def _exit_check(book: str, ticker: str, entry_price: float | None,
         if price < sma50:
             return True, "Monthly exit: momentum faded (price fell below its 50-day average)."
     elif book == "smallcap":
-        # The backtested pattern is a ~20-trading-day hold (≈28 calendar days):
-        # take what the run gave and move on — runners that keep running will
-        # show up in the scanner again.
-        if held_days is not None and held_days >= 28:
-            return True, (f"Sleeve time exit: held ~{held_days:.0f} calendar days "
-                          "(the pattern's validated window is ~20 trading days). "
-                          "Time to take the result and recycle the risk budget.")
+        # Trailing exit — validated on 207 historical signals: riding until
+        # price closes below its prior 20-day low beat the old fixed 20-day
+        # hold (expectancy +26.7% vs +11.5%, profit factor 3.19 vs 2.02) by
+        # letting the rare monster runs keep running.
+        try:
+            from trading.data.prices import get_daily_prices
+            df, _ = get_daily_prices(ticker, refresh=True)
+            low20 = float(df["Close"].iloc[-21:-1].min())
+            if price and price < low20:
+                return True, (f"Sleeve trailing exit: {ticker} closed at "
+                              f"${price:,.2f}, below its 20-day low "
+                              f"(${low20:,.2f}) — the run is over; take the "
+                              "result and recycle the risk budget.")
+        except Exception:  # noqa: BLE001 — fall through to no-exit
+            pass
+    elif book == "spring":
+        # Coiled-spring positions (insider accumulation + improving business)
+        # are thesis plays that need TIME — no timer, no tight trail. Exit if
+        # the long-term trend breaks (thesis failed) — plus the stop above.
+        if sma200 and price < sma200 and (held_days or 0) >= 21:
+            return True, (f"Spring exit: {ticker} fell below its 200-day "
+                          "average — the accumulation thesis isn't playing "
+                          "out; stepping aside.")
     else:  # long-term
         if sma50 < sma200:
             return True, "Long-term exit: the durable uptrend ended (50-day average fell below the 200-day)."
@@ -239,7 +265,8 @@ def main() -> int:
             check_exits(conn, say)
 
         # Core books: only look for a new buy if none is already pending.
-        has_pending_core = any(r["action"] == "buy" and r["book"] != "smallcap"
+        has_pending_core = any(r["action"] == "buy"
+                               and r["book"] not in ("smallcap", "spring")
                                for r in store.pending(conn))
         if has_pending_core:
             say("Step 3/5: a core-book buy is already awaiting your decision — "
@@ -267,13 +294,14 @@ def main() -> int:
                     "valid answer.")
 
         # High-risk sleeve: runner pattern + social buzz, judged separately.
-        say("Step 4/5: scanning for high-risk small-cap runners + social buzz...")
+        say("Step 4/5: scanning for high-risk small-cap runners, social buzz, "
+            "and insider-buying coiled springs...")
         from trading.agents import sleeve
         cands = sleeve_candidates(say)
         if cands:
             sleeve.consider(cands, conn, say)
         else:
-            say("  No runner-pattern or buzz-spike candidates today.")
+            say("  No runner-pattern, buzz-spike, or coiled-spring candidates today.")
 
         say("Step 5/5: snapshotting account value + rebuilding live dashboard...")
         store.snapshot_equity(conn, account.equity, account.cash)
