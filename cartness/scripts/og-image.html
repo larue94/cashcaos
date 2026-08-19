@@ -1,0 +1,41 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#FAFAF9;--surface:#FFFFFF;--border:#E7E5E4;--ink:#1C1917;--muted:#57534E;--accent:#C2410C;}
+*{box-sizing:border-box;margin:0}
+body{width:1200px;height:630px;background:var(--bg);font-family:Inter,sans-serif;color:var(--ink);
+     padding:72px;display:flex;flex-direction:column;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:12px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:28px;letter-spacing:-.02em}
+.row{display:flex;gap:56px;align-items:center}
+h1{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:60px;line-height:1.08;letter-spacing:-.02em;max-width:640px;text-wrap:balance}
+p{margin-top:24px;font-size:22px;line-height:1.5;color:var(--muted);max-width:600px}
+.card{flex:0 0 340px;background:var(--surface);border:2px solid var(--ink);border-radius:6px;padding:24px}
+.lab{font-family:'IBM Plex Mono',monospace;font-size:13px;letter-spacing:.12em;color:var(--muted);padding-bottom:14px;border-bottom:1px solid var(--ink)}
+.score{display:flex;align-items:baseline;gap:10px;padding-top:18px}
+.n{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:86px;line-height:1;color:var(--accent)}
+.t{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:22px;color:var(--muted)}
+.tags{margin-top:20px;display:flex;flex-direction:column;gap:10px}
+.tag{font-family:'IBM Plex Mono',monospace;font-size:11.5px;white-space:nowrap;letter-spacing:.06em;padding:3px 8px;border-radius:6px;align-self:flex-start}
+.blk{background:var(--accent);color:#fff}
+.hi{border:1px solid var(--accent);color:var(--accent)}
+.foot{font-family:'IBM Plex Mono',monospace;font-size:16px;color:var(--muted);border-top:1px solid var(--border);padding-top:22px}
+</style></head><body>
+<div class="brand">
+<svg width="30" height="30" viewBox="0 0 32 32" fill="none">
+<path d="M2.5 4.5h3.2l2.1 6" stroke="#1C1917" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M7.5 10.5h22L26.8 21.5H10.2z" stroke="#1C1917" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="11.9" y="13" width="2" height="6" fill="#1C1917"/><rect x="15.5" y="13" width="1.2" height="6" fill="#1C1917"/>
+<rect x="18.3" y="13" width="2.6" height="6" fill="#C2410C"/><rect x="22.5" y="13" width="1.2" height="6" fill="#1C1917"/>
+<rect x="25.1" y="13" width="1.6" height="6" fill="#1C1917"/>
+<circle cx="13.5" cy="26.8" r="1.9" stroke="#1C1917" stroke-width="2"/><circle cx="24" cy="26.8" r="1.9" stroke="#1C1917" stroke-width="2"/>
+</svg>Cartness</div>
+<div class="row">
+<div><h1>Your store converts humans. Can it convert AI agents?</h1>
+<p>A readiness score and a prioritized fix list for the machine buyer reading your catalog.</p></div>
+<div class="card"><div class="lab">AGENT READINESS</div>
+<div class="score"><span class="n">58</span><span class="t">/ 100</span></div>
+<div class="tags"><span class="tag blk">BLOCKER — Ambiguous price</span><span class="tag blk">BLOCKER — Coupon rule in prose</span><span class="tag hi">HIGH — Variant mismatch</span></div>
+</div></div>
+<div class="foot">cartness — agent readiness scanning for Shopify stores</div>
+</body></html>

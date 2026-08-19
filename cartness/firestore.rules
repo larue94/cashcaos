@@ -1,0 +1,49 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------------
+    // leads — the landing page's email capture.
+    //
+    // CREATE  : anyone (visitors never sign in), subject to validation below.
+    // READ    : nobody from the public site. Use the Firebase console or a
+    //           server-side Admin SDK credential to read leads.
+    // UPDATE  : nobody.
+    // DELETE  : nobody.
+    // ------------------------------------------------------------------
+    match /leads/{leadId} {
+      allow create: if isValidLead(request.resource.data);
+      allow read, update, delete: if false;
+    }
+
+    // Everything else is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidLead(data) {
+      return
+        // Exactly these fields, no extras a spammer could stuff in.
+        data.keys().hasOnly(['email', 'createdAt', 'source', 'tier'])
+        && data.keys().hasAll(['email', 'createdAt', 'source', 'tier'])
+
+        // Basic email validation.
+        && data.email is string
+        && data.email.size() >= 6
+        && data.email.size() <= 254
+        && data.email.matches('^[^@\\s]+@[^@\\s]+[.][^@\\s]+$')
+
+        // Which CTA the lead came from.
+        && data.source is string
+        && data.source.size() > 0
+        && data.source.size() <= 40
+
+        // Pricing tier, only when a tier button was clicked.
+        && (data.tier == null || (data.tier is string && data.tier.size() <= 40))
+
+        // Timestamp must be the server's, not a client-supplied value.
+        && data.createdAt == request.time;
+    }
+  }
+}
